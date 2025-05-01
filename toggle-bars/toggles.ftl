@@ -1,0 +1,1 @@
+toggle-combined = Toggle Both Toolbars

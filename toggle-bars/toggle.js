@@ -3,8 +3,22 @@ Toggles = {
   version: null,
   rootURI: null,
   initialized: false,
-  tab_bar_visible: true,
-  annotation_bar_visible: true,
+
+  // Track UI states
+  states: {
+    tabBar: true,
+    annotationBar: true
+  },
+
+  // Constants
+  SHORTCUTS: {
+    TAB_BAR: "t",
+    ANNOTATION_BAR: "a",
+    SIDEBAR: "b",
+    COMBINED: "h"  // New combined shortcut
+  },
+
+  // Track added elements for cleanup
   addedElementIDs: [],
 
   init({ id, version, rootURI }) {
@@ -13,147 +27,242 @@ Toggles = {
     this.version = version;
     this.rootURI = rootURI;
     this.initialized = true;
-
-    // Zotero.getOSVersion().then((version) => {
-    //     Toggles.macOs = version.includes("macOS");
-    // });
   },
 
   log(msg) {
     Zotero.debug("Toggle-Bars: " + msg);
   },
 
-  toggleListener(doc, key, toggle) {
-    doc.addEventListener('keydown', function(event) {
-        if ((event.ctrlKey) && event.key === key) {
-          toggle(doc);
+  /**
+   * Add keyboard shortcut listener
+   * @param {Document} doc - Document to attach listener to
+   * @param {string} key - Key to listen for
+   * @param {Function} callback - Function to call when shortcut triggered
+   * @param {Object} options - Additional options
+   */
+  toggleListener(doc, key, callback, options = {}) {
+    doc.addEventListener('keydown', (event) => {
+      // Check for Ctrl+Cmd+key combination
+      if (options.requireCtrlCmd) {
+        if (event.ctrlKey && event.metaKey && event.key === key) {
+          callback();
+          event.preventDefault();
         }
+      }
+      // Original behavior - just Ctrl+key
+      else if (event.ctrlKey && event.key === key) {
+        callback();
+        event.preventDefault();
+      }
     });
+  },
+
+  /**
+   * Create menu item with associated command and shortcut
+   * @param {Document} doc - Document to create element in
+   * @param {Object} config - Configuration object
+   */
+  createMenuItem(doc, { id, l10nId, shortcutKey, callback, requireCtrlCmd = false }) {
+    const menuItem = doc.createXULElement('menuitem');
+    menuItem.id = id;
+    menuItem.setAttribute('data-l10n-id', l10nId);
+    menuItem.addEventListener('command', callback);
+
+    // Register for cleanup
+    this.storeAddedElement(menuItem);
+
+    // Add keyboard shortcut if provided
+    if (shortcutKey) {
+      this.toggleListener(doc, shortcutKey, callback, { requireCtrlCmd });
+    }
+
+    return menuItem;
   },
 
   addMenuItems(doc, manualPopup) {
-    var viewPopup;
-    if (manualPopup) {
-      // The view popup happens to have no ID, but is the 2nd menupopup in the document
-      viewPopup = doc.querySelectorAll("menupopup")[2];
-    } else {
-      viewPopup = doc.getElementById('menu_viewPopup');
-    }
-     
-    // Tab Bar Toggle
-    let tab_bar_item = doc.createXULElement('menuitem');
-    tab_bar_item.id = 'toggle-tab';
-    tab_bar_item.setAttribute('data-l10n-id', 'toggle-tab');
-    tab_bar_item.addEventListener('command', () => {
-      Toggles.toggleTabBar(doc);
-    });
-    viewPopup.appendChild(tab_bar_item);
-    // add shortcut key
-    Toggles.toggleListener(doc, "t", () => Toggles.toggleTabBar(doc));
-    this.storeAddedElement(tab_bar_item);
+    try {
+      // Find the view popup menu
+      const viewPopup = manualPopup
+        ? doc.querySelectorAll("menupopup")[2]
+        : doc.getElementById('menu_viewPopup');
 
-    // Annotation Tool Bar Toggle
-    let annotation_tool_bar = doc.createXULElement('menuitem');
-    annotation_tool_bar.id = 'toggle-ann';
-    annotation_tool_bar.setAttribute('data-l10n-id', 'toggle-ann');
-    annotation_tool_bar.addEventListener('command', () => {
-      Toggles.toggleAnnotation(annotation_tool_bar.checked);
-    });
-    viewPopup.appendChild(annotation_tool_bar);
-    Toggles.toggleListener(doc, "a", () => Toggles.toggleAnnotation());
-    this.storeAddedElement(annotation_tool_bar);
-
-    // Sidebar toggle
-    let side_bar_toggle = doc.createXULElement('menuitem');
-    side_bar_toggle.id = 'toggle-sidebar';
-    side_bar_toggle.setAttribute('data-l10n-id', 'toggle-sidebar');
-    side_bar_toggle.addEventListener('command', () => {
-      Toggles.toggleSidebar();
-    });
-    viewPopup.appendChild(side_bar_toggle);
-    Toggles.toggleListener(doc, "b", () => Toggles.toggleSidebar());
-    this.storeAddedElement(side_bar_toggle);
-  },
-
-  toggleTabBar(doc, on) {
-    let title_bar = doc.getElementById("zotero-title-bar")
-    if (this.tab_bar_visible) {
-      title_bar.style.display = "none"
-      this.tab_bar_visible = false
-
-    } else {
-      title_bar.setAttribute("style", "")
-      this.tab_bar_visible = true;
-    }
-
-  },
-
-  toggleAnnotation(on) {
-    // let tab_id = Zotero.getMainWindow().Zotero_Tabs._selectedID 
-    // let doc = Zotero.Reader.getByTabID(tab_id)._iframeWindow.document
-    
-    Zotero.Reader._readers.forEach(reader => {
-      let doc = reader._iframeWindow.document;
-
-      if (Toggles.annotation_bar_visible) {
-        reader._iframeWindow.eval(
-          "document.getElementById('fix-popup')?.remove(); let style = document.createElement('style'); style.id = 'fix-popup'; style.innerHTML = '.view-popup {margin-top: -40px;}'; document.head.appendChild(style)"
-        )
-        if (doc.querySelector(".toolbar")) {
-          doc.querySelector(".toolbar").style.display = "none"
-        }
-        if (doc.querySelector("#split-view")) {
-          doc.querySelector("#split-view").style.top = "0"
-        }
-        if (doc.querySelector("#sidebarContainer")) {
-          doc.querySelector("#sidebarContainer").style.top = "0"
-        }
-      } else {
-        reader._iframeWindow.eval(
-          "document.getElementById('fix-popup')?.remove()"
-        )
-        doc.querySelector(".toolbar")?.setAttribute("style", "")
-        doc.querySelector("#split-view")?.setAttribute("style", "")
-        doc.querySelector("#sidebarContainer")?.setAttribute("style", "")
+      if (!viewPopup) {
+        this.log("View popup menu not found");
+        return;
       }
 
-    });
+      // Tab Bar Toggle
+      const tabBarCallback = () => this.toggleTabBar(doc);
+      const tabBarItem = this.createMenuItem(doc, {
+        id: 'toggle-tab',
+        l10nId: 'toggle-tab',
+        shortcutKey: this.SHORTCUTS.TAB_BAR,
+        callback: tabBarCallback
+      });
+      viewPopup.appendChild(tabBarItem);
 
-    this.annotation_bar_visible = !this.annotation_bar_visible;
+      // Annotation Tool Bar Toggle
+      const annotationCallback = () => this.toggleAnnotation();
+      const annotationItem = this.createMenuItem(doc, {
+        id: 'toggle-ann',
+        l10nId: 'toggle-ann',
+        shortcutKey: this.SHORTCUTS.ANNOTATION_BAR,
+        callback: annotationCallback
+      });
+      viewPopup.appendChild(annotationItem);
+
+      // Sidebar toggle
+      const sidebarCallback = () => this.toggleSidebar();
+      const sidebarItem = this.createMenuItem(doc, {
+        id: 'toggle-sidebar',
+        l10nId: 'toggle-sidebar',
+        shortcutKey: this.SHORTCUTS.SIDEBAR,
+        callback: sidebarCallback
+      });
+      viewPopup.appendChild(sidebarItem);
+
+      // Combined tab bar and annotation bar toggle
+      const combinedCallback = () => this.toggleCombined(doc);
+      const combinedItem = this.createMenuItem(doc, {
+        id: 'toggle-combined',
+        l10nId: 'toggle-combined',
+        shortcutKey: this.SHORTCUTS.COMBINED,
+        callback: combinedCallback,
+        requireCtrlCmd: true  // Require both Ctrl and Cmd keys
+      });
+      viewPopup.appendChild(combinedItem);
+    } catch (e) {
+      this.log(`Error adding menu items: ${e.message}`);
+    }
+  },
+
+  toggleTabBar(doc) {
+    try {
+      const titleBar = doc.getElementById("zotero-title-bar");
+      if (!titleBar) {
+        this.log("Tab bar element not found");
+        return;
+      }
+
+      if (this.states.tabBar) {
+        titleBar.style.display = "none";
+      } else {
+        titleBar.removeAttribute("style");
+      }
+
+      this.states.tabBar = !this.states.tabBar;
+    } catch (e) {
+      this.log(`Error toggling tab bar: ${e.message}`);
+    }
+  },
+
+  toggleAnnotation() {
+    try {
+      Zotero.Reader._readers.forEach(reader => {
+        if (!reader || !reader._iframeWindow) return;
+
+        const doc = reader._iframeWindow.document;
+
+        if (this.states.annotationBar) {
+          // Hide annotation bar
+          reader._iframeWindow.eval(
+            "document.getElementById('fix-popup')?.remove(); " +
+            "let style = document.createElement('style'); " +
+            "style.id = 'fix-popup'; " +
+            "style.innerHTML = '.view-popup {margin-top: -40px;}'; " +
+            "document.head.appendChild(style)"
+          );
+
+          // Adjust UI elements
+          this.adjustElement(doc.querySelector(".toolbar"), "display", "none");
+          this.adjustElement(doc.querySelector("#split-view"), "top", "0");
+          this.adjustElement(doc.querySelector("#sidebarContainer"), "top", "0");
+        } else {
+          // Restore annotation bar
+          reader._iframeWindow.eval(
+            "document.getElementById('fix-popup')?.remove()"
+          );
+
+          // Reset UI elements
+          this.resetElement(doc.querySelector(".toolbar"));
+          this.resetElement(doc.querySelector("#split-view"));
+          this.resetElement(doc.querySelector("#sidebarContainer"));
+        }
+      });
+
+      this.states.annotationBar = !this.states.annotationBar;
+    } catch (e) {
+      this.log(`Error toggling annotation bar: ${e.message}`);
+    }
+  },
+
+  // Helper to adjust element style
+  adjustElement(element, property, value) {
+    if (element) element.style[property] = value;
+  },
+
+  // Helper to reset element style
+  resetElement(element) {
+    if (element) element.removeAttribute("style");
   },
 
   toggleSidebar() {
-    Zotero.Reader._readers.forEach(reader => {
-      reader.toggleSidebar();
-    });
+    try {
+      Zotero.Reader._readers.forEach(reader => {
+        if (reader && typeof reader.toggleSidebar === 'function') {
+          reader.toggleSidebar();
+        }
+      });
+    } catch (e) {
+      this.log(`Error toggling sidebar: ${e.message}`);
+    }
+  },
+
+  toggleCombined(doc) {
+    try {
+      this.toggleTabBar(doc);
+      this.toggleAnnotation();
+    } catch (e) {
+      this.log(`Error toggling combined tab bar and annotation bar: ${e.message}`);
+    }
   },
 
   addToWindow(window, manualPopup = false) {
-    // Use Fluent for localization
-    window.MozXULElement.insertFTLIfNeeded("toggles.ftl");
-
-    this.addMenuItems(window.document, manualPopup);
+    try {
+      // Use Fluent for localization
+      window.MozXULElement.insertFTLIfNeeded("toggles.ftl");
+      this.addMenuItems(window.document, manualPopup);
+    } catch (e) {
+      this.log(`Error adding to window: ${e.message}`);
+    }
   },
 
   addToAllWindows() {
-    var windows = Zotero.getMainWindows();
-    for (let win of windows) {
-      if (!win.ZoteroPane) continue;
-      this.addToWindow(win);
-    }
-
-    let windowListener = {
-      onOpenWindow: function(aWindow) {
-          let domWindow = aWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-                                  .getInterface(Components.interfaces.nsIDOMWindow);
-          domWindow.addEventListener("load", function() {
-              Toggles.addToWindow(domWindow, true);
-          }, {once: true});
+    try {
+      // Add to existing windows
+      const windows = Zotero.getMainWindows();
+      for (let win of windows) {
+        if (win.ZoteroPane) {
+          this.addToWindow(win);
+        }
       }
-    };
-  
-    // Add the listener to detect new windows
-    Services.wm.addListener(windowListener);
+
+      // Add listener for new windows
+      const windowListener = {
+        onOpenWindow: (aWindow) => {
+          const domWindow = aWindow.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
+            .getInterface(Components.interfaces.nsIDOMWindow);
+
+          domWindow.addEventListener("load", () => {
+            this.addToWindow(domWindow, true);
+          }, {once: true});
+        }
+      };
+
+      Services.wm.addListener(windowListener);
+    } catch (e) {
+      this.log(`Error adding to all windows: ${e.message}`);
+    }
   },
 
   storeAddedElement(elem) {
@@ -164,28 +273,34 @@ Toggles = {
   },
 
   removeFromWindow(window) {
-    var doc = window.document;
-    // Remove all elements added to DOM
-    for (let id of this.addedElementIDs) {
-      doc.getElementById(id)?.remove();
+    try {
+      const doc = window.document;
+
+      // Remove all elements added to DOM
+      for (let id of this.addedElementIDs) {
+        const element = doc.getElementById(id);
+        if (element) element.remove();
+      }
+
+      // Remove localization
+      const ftlLink = doc.querySelector('[href="toggles.ftl"]');
+      if (ftlLink) ftlLink.remove();
+    } catch (e) {
+      this.log(`Error removing from window: ${e.message}`);
     }
-    doc.querySelector('[href="toggles.ftl"]').remove();
   },
 
   removeFromAllWindows() {
-    var windows = Zotero.getMainWindows();
+    const windows = Zotero.getMainWindows();
     for (let win of windows) {
-      if (!win.ZoteroPane) continue;
-      this.removeFromWindow(win);
+      if (win.ZoteroPane) {
+        this.removeFromWindow(win);
+      }
     }
   },
 
   async main() {
-    // Global properties are included automatically in Zotero 7
-    // var host = new URL('https://foo.com/path').host;
-    // this.log(`Host is ${host}`);
-
-    // // Retrieve a global pref
-    // this.log(`Intensity is ${Zotero.Prefs.get('extensions.make-it-red.intensity', true)}`);
-  },
+    // Plugin initialization complete
+    this.log("Toggle-Bars plugin initialized");
+  }
 };
