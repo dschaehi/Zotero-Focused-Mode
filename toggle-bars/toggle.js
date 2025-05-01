@@ -27,6 +27,9 @@ Toggles = {
     this.version = version;
     this.rootURI = rootURI;
     this.initialized = true;
+
+    // Register tab selection listener
+    this.registerTabChangeListener();
   },
 
   log(msg) {
@@ -291,11 +294,119 @@ Toggles = {
   },
 
   removeFromAllWindows() {
+    // Clean up tab listener if it exists
+    if (this.tabListener && Zotero.Tabs && typeof Zotero.Tabs.removeListener === 'function') {
+      Zotero.Tabs.removeListener(this.tabListener);
+    }
+
+    // Clean up mutation observer if it exists
+    if (this.tabObserver) {
+      this.tabObserver.disconnect();
+    }
+
+    // Existing code
     const windows = Zotero.getMainWindows();
     for (let win of windows) {
       if (win.ZoteroPane) {
         this.removeFromWindow(win);
       }
+    }
+  },
+
+  registerTabChangeListener() {
+    try {
+      // Method 1: Use Zotero's Tabs API
+      if (Zotero.Tabs && typeof Zotero.Tabs.addListener === 'function') {
+        this.tabListener = {
+          onSelect: (tab) => {
+            this.restoreTabBarIfHidden();
+          }
+        };
+        Zotero.Tabs.addListener(this.tabListener);
+        this.log("Tab change listener registered via API");
+      }
+
+      // Method 2: Enhanced keyboard shortcut monitoring for tab navigation
+      const windows = Zotero.getMainWindows();
+      for (let win of windows) {
+        if (win.ZoteroPane) {
+          // Monitor keyboard events at the capturing phase to catch them before they're processed
+          win.document.addEventListener('keydown', (event) => {
+            // Check for tab navigation shortcuts (Cmd+Shift+[ or ], Cmd+number)
+            if ((event.metaKey && event.shiftKey && (event.key === '[' || event.key === ']')) ||
+                (event.metaKey && /^\d$/.test(event.key))) {
+              // Longer delay to ensure tab change completes
+              setTimeout(() => this.restoreTabBarIfHidden(), 50);
+            }
+          }, true); // Using capture phase to get events early
+
+          // Also watch for keyup to catch if user holds down the key
+          win.document.addEventListener('keyup', (event) => {
+            if ((event.metaKey && event.shiftKey && (event.key === '[' || event.key === ']')) ||
+                (event.metaKey && /^\d$/.test(event.key))) {
+              setTimeout(() => this.restoreTabBarIfHidden(), 50);
+            }
+          }, true);
+
+          // Method 3: Monitor tab element clicks directly
+          const tabList = win.document.getElementById("zotero-tab-toolbar");
+          if (tabList) {
+            tabList.addEventListener('click', () => {
+              setTimeout(() => this.restoreTabBarIfHidden(), 50);
+            }, true);
+          }
+
+          // Method 4: Broader mutation observer for tab changes
+          const mainWindow = win.document.getElementById("main-window");
+          if (mainWindow) {
+            const observer = new MutationObserver(() => {
+              // Check if tab has changed by looking at the 'selected' attribute on tabs
+              const selectedTab = win.document.querySelector('.tab[selected="true"]');
+              if (selectedTab) {
+                setTimeout(() => this.restoreTabBarIfHidden(), 50);
+              }
+            });
+
+            observer.observe(mainWindow, {
+              attributes: true,
+              attributeFilter: ['selected'],
+              subtree: true,
+              childList: true // Also watch for DOM structure changes
+            });
+
+            // Store observer for cleanup
+            this.tabObserver = observer;
+            this.log("Enhanced tab change observer registered");
+          }
+
+          // Method 5: Use window's hashchange event as tabs may update URL
+          win.addEventListener('hashchange', () => {
+            setTimeout(() => this.restoreTabBarIfHidden(), 50);
+          });
+        }
+      }
+    } catch (e) {
+      this.log(`Error registering tab change listener: ${e.message}`);
+    }
+  },
+
+  restoreTabBarIfHidden() {
+    try {
+      if (!this.states.tabBar) {
+        const windows = Zotero.getMainWindows();
+        for (let win of windows) {
+          if (win.ZoteroPane) {
+            const titleBar = win.document.getElementById("zotero-title-bar");
+            if (titleBar) {
+              titleBar.removeAttribute("style");
+              this.states.tabBar = true;
+              this.log("Tab bar automatically restored on tab change");
+            }
+          }
+        }
+      }
+    } catch (e) {
+      this.log(`Error restoring tab bar: ${e.message}`);
     }
   },
 
