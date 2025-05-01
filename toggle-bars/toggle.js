@@ -223,8 +223,25 @@ Toggles = {
 
   toggleCombined(doc) {
     try {
-      this.toggleTabBar(doc);
-      this.toggleAnnotation();
+      // If tab bar is visible and annotation bar is hidden,
+      // only hide the tab bar without showing annotation bar
+      if (this.states.tabBar && !this.states.annotationBar) {
+        this.toggleTabBar(doc);
+      }
+      // If both are visible or both are hidden, toggle both
+      else if ((this.states.tabBar && this.states.annotationBar) ||
+              (!this.states.tabBar && !this.states.annotationBar)) {
+        this.toggleTabBar(doc);
+        this.toggleAnnotation();
+      }
+      // If tab bar is hidden and annotation bar is visible,
+      // only show tab bar without hiding annotation bar
+      else if (!this.states.tabBar && this.states.annotationBar) {
+        this.toggleTabBar(doc);
+      }
+
+      this.log(`Combined toggle: tab bar ${this.states.tabBar ? 'visible' : 'hidden'}, ` +
+               `annotation bar ${this.states.annotationBar ? 'visible' : 'hidden'}`);
     } catch (e) {
       this.log(`Error toggling combined tab bar and annotation bar: ${e.message}`);
     }
