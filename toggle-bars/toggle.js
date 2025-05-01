@@ -336,7 +336,7 @@ Toggles = {
       if (Zotero.Tabs && typeof Zotero.Tabs.addListener === 'function') {
         this.tabListener = {
           onSelect: (tab) => {
-            this.restoreTabBarIfHidden();
+            this.restoreUIElementsOnTabChange();
           }
         };
         Zotero.Tabs.addListener(this.tabListener);
@@ -347,21 +347,21 @@ Toggles = {
       const windows = Zotero.getMainWindows();
       for (let win of windows) {
         if (win.ZoteroPane) {
-          // Monitor keyboard events at the capturing phase to catch them before they're processed
+          // Monitor keyboard events at the capturing phase
           win.document.addEventListener('keydown', (event) => {
             // Check for tab navigation shortcuts (Cmd+Shift+[ or ], Cmd+number)
             if ((event.metaKey && event.shiftKey && (event.key === '[' || event.key === ']')) ||
                 (event.metaKey && /^\d$/.test(event.key))) {
               // Longer delay to ensure tab change completes
-              setTimeout(() => this.restoreTabBarIfHidden(), 50);
+              setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
             }
-          }, true); // Using capture phase to get events early
+          }, true);
 
-          // Also watch for keyup to catch if user holds down the key
+          // Also watch for keyup events
           win.document.addEventListener('keyup', (event) => {
             if ((event.metaKey && event.shiftKey && (event.key === '[' || event.key === ']')) ||
                 (event.metaKey && /^\d$/.test(event.key))) {
-              setTimeout(() => this.restoreTabBarIfHidden(), 50);
+              setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
             }
           }, true);
 
@@ -369,7 +369,7 @@ Toggles = {
           const tabList = win.document.getElementById("zotero-tab-toolbar");
           if (tabList) {
             tabList.addEventListener('click', () => {
-              setTimeout(() => this.restoreTabBarIfHidden(), 50);
+              setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
             }, true);
           }
 
@@ -380,26 +380,17 @@ Toggles = {
               // Check if tab has changed by looking at the 'selected' attribute on tabs
               const selectedTab = win.document.querySelector('.tab[selected="true"]');
               if (selectedTab) {
-                setTimeout(() => this.restoreTabBarIfHidden(), 50);
+                setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
               }
             });
 
-            observer.observe(mainWindow, {
-              attributes: true,
-              attributeFilter: ['selected'],
-              subtree: true,
-              childList: true // Also watch for DOM structure changes
+            // Observer configuration remains the same
+
+            // Method 5: Use window's hashchange event
+            win.addEventListener('hashchange', () => {
+              setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
             });
-
-            // Store observer for cleanup
-            this.tabObserver = observer;
-            this.log("Enhanced tab change observer registered");
           }
-
-          // Method 5: Use window's hashchange event as tabs may update URL
-          win.addEventListener('hashchange', () => {
-            setTimeout(() => this.restoreTabBarIfHidden(), 50);
-          });
         }
       }
     } catch (e) {
@@ -407,23 +398,52 @@ Toggles = {
     }
   },
 
-  restoreTabBarIfHidden() {
+  restoreUIElementsOnTabChange() {
     try {
+      let uiChanged = false;
+      const windows = Zotero.getMainWindows();
+
+      // Restore tab bar if hidden
       if (!this.states.tabBar) {
-        const windows = Zotero.getMainWindows();
         for (let win of windows) {
           if (win.ZoteroPane) {
             const titleBar = win.document.getElementById("zotero-title-bar");
             if (titleBar) {
               titleBar.removeAttribute("style");
               this.states.tabBar = true;
-              this.log("Tab bar automatically restored on tab change");
+              uiChanged = true;
             }
           }
         }
       }
+
+      // Restore annotation bar if hidden
+      if (!this.states.annotationBar) {
+        Zotero.Reader._readers.forEach(reader => {
+          if (!reader || !reader._iframeWindow) return;
+
+          const doc = reader._iframeWindow.document;
+
+          // Restore annotation bar
+          reader._iframeWindow.eval(
+            "document.getElementById('fix-popup')?.remove()"
+          );
+
+          // Reset UI elements
+          this.resetElement(doc.querySelector(".toolbar"));
+          this.resetElement(doc.querySelector("#split-view"));
+          this.resetElement(doc.querySelector("#sidebarContainer"));
+        });
+
+        this.states.annotationBar = true;
+        uiChanged = true;
+      }
+
+      if (uiChanged) {
+        this.log("UI elements automatically restored on tab change");
+      }
     } catch (e) {
-      this.log(`Error restoring tab bar: ${e.message}`);
+      this.log(`Error restoring UI elements on tab change: ${e.message}`);
     }
   },
 
