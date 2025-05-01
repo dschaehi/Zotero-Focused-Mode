@@ -12,10 +12,7 @@ Toggles = {
 
   // Constants
   SHORTCUTS: {
-    TAB_BAR: "t",
-    ANNOTATION_BAR: "a",
-    SIDEBAR: "b",
-    COMBINED: "h"  // New combined shortcut
+    COMBINED: "h"  // Combined shortcut
   },
 
   // Track added elements for cleanup
@@ -94,37 +91,9 @@ Toggles = {
         return;
       }
 
-      // Tab Bar Toggle
-      const tabBarCallback = () => this.toggleTabBar(doc);
-      const tabBarItem = this.createMenuItem(doc, {
-        id: 'toggle-tab',
-        l10nId: 'toggle-tab',
-        shortcutKey: this.SHORTCUTS.TAB_BAR,
-        callback: tabBarCallback
-      });
-      viewPopup.appendChild(tabBarItem);
+      // Remove Tab Bar, Annotation Tool Bar, and Sidebar toggle menu items
 
-      // Annotation Tool Bar Toggle
-      const annotationCallback = () => this.toggleAnnotation();
-      const annotationItem = this.createMenuItem(doc, {
-        id: 'toggle-ann',
-        l10nId: 'toggle-ann',
-        shortcutKey: this.SHORTCUTS.ANNOTATION_BAR,
-        callback: annotationCallback
-      });
-      viewPopup.appendChild(annotationItem);
-
-      // Sidebar toggle
-      const sidebarCallback = () => this.toggleSidebar();
-      const sidebarItem = this.createMenuItem(doc, {
-        id: 'toggle-sidebar',
-        l10nId: 'toggle-sidebar',
-        shortcutKey: this.SHORTCUTS.SIDEBAR,
-        callback: sidebarCallback
-      });
-      viewPopup.appendChild(sidebarItem);
-
-      // Combined tab bar and annotation bar toggle
+      // Keep Combined tab bar and annotation bar toggle
       const combinedCallback = () => this.toggleCombined(doc);
       const combinedItem = this.createMenuItem(doc, {
         id: 'toggle-combined',
@@ -207,18 +176,6 @@ Toggles = {
   // Helper to reset element style
   resetElement(element) {
     if (element) element.removeAttribute("style");
-  },
-
-  toggleSidebar() {
-    try {
-      Zotero.Reader._readers.forEach(reader => {
-        if (reader && typeof reader.toggleSidebar === 'function') {
-          reader.toggleSidebar();
-        }
-      });
-    } catch (e) {
-      this.log(`Error toggling sidebar: ${e.message}`);
-    }
   },
 
   toggleCombined(doc) {
