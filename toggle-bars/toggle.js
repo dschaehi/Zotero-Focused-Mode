@@ -34,7 +34,7 @@ Toggles = {
   },
 
   /**
-   * Add keyboard shortcut listener
+   * Add keyboard shortcut listener with simplified logic
    * @param {Document} doc - Document to attach listener to
    * @param {string} key - Key to listen for
    * @param {Function} callback - Function to call when shortcut triggered
@@ -42,15 +42,48 @@ Toggles = {
    */
   toggleListener(doc, key, callback, options = {}) {
     doc.addEventListener('keydown', (event) => {
-      // Check for Ctrl+Cmd+key combination
+      // Mozilla-compatible platform detection
+      let isMac;
+      try {
+        // First try using Mozilla Components
+        isMac = Components.classes["@mozilla.org/xre/app-info;1"]
+                .getService(Components.interfaces.nsIXULRuntime)
+                .OS === "Darwin";
+      } catch (e) {
+        // Fallback to Services if available
+        try {
+          isMac = Services.appinfo.OS === "Darwin";
+        } catch (e2) {
+          // Last resort hardcoded default (assuming macOS)
+          this.log("Platform detection failed, assuming Mac");
+          isMac = true;
+        }
+      }
+
+      // Simple case-insensitive key matching
+      const keyMatch = event.key.toLowerCase() === key.toLowerCase();
+
+      // Log all Ctrl or Cmd key events for debugging
+      if ((event.ctrlKey || event.metaKey) && keyMatch) {
+        this.log(`Key event: ctrl=${event.ctrlKey}, cmd=${event.metaKey}, key=${event.key}`);
+      }
+
+      // Mac: Check for Ctrl+Cmd+key
+      // Windows/Linux: Check for just Ctrl+key
       if (options.requireCtrlCmd) {
-        if (event.ctrlKey && event.metaKey && event.key === key) {
+        if (isMac && event.ctrlKey && event.metaKey && keyMatch) {
+          this.log(`Mac shortcut triggered: Ctrl+Cmd+${event.key}`);
+          callback();
+          event.preventDefault();
+        }
+        else if (!isMac && event.ctrlKey && keyMatch) {
+          this.log(`Non-Mac shortcut triggered: Ctrl+${event.key}`);
           callback();
           event.preventDefault();
         }
       }
-      // Original behavior - just Ctrl+key
-      else if (event.ctrlKey && event.key === key) {
+      // Standard Ctrl+key for all platforms
+      else if (event.ctrlKey && keyMatch) {
         callback();
         event.preventDefault();
       }
@@ -91,8 +124,6 @@ Toggles = {
         return;
       }
 
-      // Remove Tab Bar, Annotation Tool Bar, and Sidebar toggle menu items
-
       // Keep Combined tab bar and annotation bar toggle
       const combinedCallback = () => this.toggleCombined(doc);
       const combinedItem = this.createMenuItem(doc, {
@@ -100,7 +131,7 @@ Toggles = {
         l10nId: 'toggle-combined',
         shortcutKey: this.SHORTCUTS.COMBINED,
         callback: combinedCallback,
-        requireCtrlCmd: true  // Require both Ctrl and Cmd keys
+        requireCtrlCmd: true  // This is true for both Mac and Windows/Linux, just works differently
       });
       viewPopup.appendChild(combinedItem);
     } catch (e) {
