@@ -9,7 +9,9 @@ This plugin adds a single menu item to Zotero's View menu:
 
 | Before  | After |
 | ------------- | ------------- |
-| <img width="1920" alt="Screenshot 2025-05-02 at 08 27 55" src="https://github.com/user-attachments/assets/41aa2670-bbbc-4881-b39f-2d950d0d3450" /> | <img width="1920" alt="Screenshot 2025-05-02 at 08 27 18" src="https://github.com/user-attachments/assets/fe3b9eb2-12e4-4cde-9a3f-894af4fdea13" /> |
+| <img width="1920" alt="Screenshot 2025-05-02 at 08 32 38" src="https://github.com/user-attachments/assets/91f3e042-bd48-4ded-a1f8-1289e67d6ff4" /> | <img width="1920" alt="Screenshot 2025-05-02 at 08 32 58" src="https://github.com/user-attachments/assets/7a8c7537-635a-4bb2-8b4d-4f7a80888590" /> |
+
+
 
 ## Keyboard Shortcuts
 
