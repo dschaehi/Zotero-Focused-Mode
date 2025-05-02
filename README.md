@@ -1,10 +1,41 @@
 # Zotero-Toggle-Bars
-A plugin that enables you to toggle various bars in Zotero. It adds three menu bar items to the view menu:
-+ Toggle Tab Bar
-+ Toggle Annotation Toolbar
-+ Toggle Sidebar
 
-# Installation
-Run the `build.sh` file, which creates an XPI package. Drag this XPI package to the plugins dialog.
+A plugin that enables you to toggle interface elements in Zotero to create a more distraction-free workspace.
 
-Alternatively, you could use the prebuilt binary from the releases page.
+## Features
+
+This plugin adds a single menu item to Zotero's View menu:
+- **Toggle Interface Elements** - Toggles the visibility of both the tab bar and annotation toolbar
+
+## Keyboard Shortcuts
+
+- **Ctrl+Cmd+h** - Toggle interface elements
+
+## Behavior
+
+The toggle works as follows:
+- When both elements are visible, it hides both
+- When both elements are hidden, it shows both
+- If one element is visible and the other hidden, it synchronizes their states
+
+The plugin also automatically restores interface elements when switching between tabs.
+
+## Installation
+
+1. Run the `build.sh` file to create an XPI package:
+   ```bash
+   ./build.sh
+   ```
+2. Drag the resulting XPI file (from the `build` folder) to Zotero's Add-ons Manager dialog.
+
+## Requirements
+
+- Compatible with Zotero 7.0 and above
+
+## Acknowledgements
+
+This plugin is a fork of the original Zotero-Toggle-Bars plugin created by [Waleed Dahshan](https://github.com/wmstack).
+
+## License
+
+This project is licensed under the BSD 2-Clause License - see the `LICENSE` file for details.
