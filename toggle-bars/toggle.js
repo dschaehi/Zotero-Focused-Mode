@@ -14,7 +14,6 @@ Toggles = {
 
   // Constants
   SHORTCUTS: {
-    COMBINED: "h",  // Combined shortcut for toggling interfaces
     FOCUSED_MODE: {  // Single shortcut for focused mode
       mac: "f",     // Ctrl+Cmd+F on Mac
       other: "F11"  // F11 on Windows/Linux
@@ -67,7 +66,8 @@ Toggles = {
    * @param {Object} options - Additional options
    */
   toggleListener(doc, key, callback, options = {}) {
-    doc.addEventListener('keydown', (event) => {
+    // Create a named function for the event handler so we can track it
+    const keydownHandler = (event) => {
       // Get platform information
       const isMac = this.getPlatform();
 
@@ -77,86 +77,83 @@ Toggles = {
         targetKey = isMac ? key.mac : key.other;
       }
 
-      // Match key (case-insensitive)
+      // Always log shortcut attempts for debugging
+      this.log(`Key pressed: ${event.key}, ctrl=${event.ctrlKey}, cmd=${event.metaKey}, platform=${isMac ? 'Mac' : 'Other'}`);
+
+      // For Cmd+Ctrl+F on Mac
+      if (isMac && targetKey === 'f' && options.requireCtrlCmd &&
+          event.ctrlKey && event.metaKey && event.key.toLowerCase() === 'f') {
+        this.log("✓ Mac Ctrl+Cmd+F shortcut matched");
+        callback();
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      // For F11 on Windows/Linux
+      if (!isMac && targetKey === 'F11' && options.f11Special &&
+          event.key === 'F11') {
+        this.log("✓ F11 shortcut matched on Windows/Linux");
+        callback();
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      // For standard Ctrl+key shortcuts
       const keyMatch = event.key.toLowerCase() === targetKey.toLowerCase();
-      const isF11 = targetKey === "F11" && event.key === "F11";
-
-      // Log only relevant events
-      if (((keyMatch && (event.ctrlKey || event.metaKey)) || isF11)) {
-        this.log(`Key event received: ctrl=${event.ctrlKey}, cmd=${event.metaKey}, key=${event.key}, platform=${isMac ? 'Mac' : 'Other'}`);
-      }
-
-      // Handle platform-specific shortcuts
-      let shortcutMatched = false;
-
-      // Special case: F11 on Windows/Linux without modifiers
-      if (!isMac && isF11 && options.f11Special) {
-        shortcutMatched = true;
-        this.log("F11 special case matched");
-      }
-      // Mac: Ctrl+Cmd+key
-      else if (isMac && options.requireCtrlCmd && event.ctrlKey && event.metaKey && keyMatch) {
-        shortcutMatched = true;
-        this.log("Mac Ctrl+Cmd+key shortcut matched");
-      }
-      // Windows/Linux: Ctrl+key
-      else if (!isMac && options.requireCtrlCmd && event.ctrlKey && keyMatch) {
-        shortcutMatched = true;
-        this.log("Windows/Linux Ctrl+key shortcut matched");
-      }
-      // Simple Ctrl+key without platform specifics
-      else if (event.ctrlKey && keyMatch && !options.requireCtrlCmd) {
-        shortcutMatched = true;
-        this.log("Simple Ctrl+key shortcut matched");
-      }
-
-      if (shortcutMatched) {
-        this.log(`Executing callback for shortcut: ${event.key}`);
+      if (keyMatch && event.ctrlKey &&
+          ((isMac && options.requireCtrlCmd && event.metaKey) || // Mac with Cmd
+           (!isMac && options.requireCtrlCmd) ||                // Windows/Linux with Ctrl
+           (!options.requireCtrlCmd))) {                        // Plain Ctrl shortcut
+        this.log(`✓ ${isMac ? 'Mac' : 'Windows/Linux'} shortcut matched for key: ${targetKey}`);
         callback();
         event.preventDefault();
         event.stopPropagation();
       }
-    }, true);
+    };
+
+    // Add the event listener at document level
+    doc.addEventListener('keydown', keydownHandler, true);
+
+    // Store reference to the handler for cleanup
+    this.registeredShortcuts = this.registeredShortcuts || [];
+    this.registeredShortcuts.push({
+      doc,
+      handler: keydownHandler,
+      key: typeof key === 'object' ?
+        (this.getPlatform() ? key.mac : key.other) : key
+    });
   },
 
   /**
    * Create menu item with associated command and shortcut
-   * @param {Document} doc - Document to create element in
-   * @param {Object} config - Configuration object
    */
   createMenuItem(doc, { id, l10nId, shortcutKey, callback, requireCtrlCmd = false, f11Special = false }) {
     const menuItem = doc.createXULElement('menuitem');
     menuItem.id = id;
     menuItem.setAttribute('data-l10n-id', l10nId);
-    menuItem.addEventListener('command', callback);
 
-    // Register for cleanup
+    // Create a wrapper that logs execution and only runs when document is viewed
+    const wrappedCallback = () => {
+      const isViewing = this.isViewingDocument();
+      this.log(`Menu item clicked: ${id}, document is being viewed: ${isViewing}`);
+
+      // Remove this condition to make menu items work regardless of document view
+      // if (!isViewing) return;
+
+      callback();
+    };
+
+    menuItem.addEventListener('command', wrappedCallback);
     this.storeAddedElement(menuItem);
 
-    // Add keyboard shortcut if provided
+    // Add keyboard shortcut - always register it
     if (shortcutKey) {
-      // Skip second registration if keys are the same
-      const isMac = this.getPlatform();
-      const alreadyRegistered =
-        typeof shortcutKey === 'object' &&
-        this.registeredShortcuts &&
-        this.registeredShortcuts.some(s =>
-          s.key === (isMac ? shortcutKey.mac : shortcutKey.other));
-
-      if (!alreadyRegistered) {
-        this.toggleListener(doc, shortcutKey, callback, {
-          requireCtrlCmd,
-          f11Special
-        });
-
-        // Track registered shortcut
-        this.registeredShortcuts = this.registeredShortcuts || [];
-        this.registeredShortcuts.push({
-          key: typeof shortcutKey === 'object' ?
-            (isMac ? shortcutKey.mac : shortcutKey.other) : shortcutKey,
-          id
-        });
-      }
+      this.toggleListener(doc, shortcutKey, wrappedCallback, {
+        requireCtrlCmd,
+        f11Special
+      });
     }
 
     return menuItem;
@@ -174,28 +171,27 @@ Toggles = {
         return;
       }
 
-      // Keep Combined tab bar and annotation bar toggle
-      const combinedCallback = () => this.toggleCombined(doc);
-      const combinedItem = this.createMenuItem(doc, {
-        id: 'toggle-combined',
-        l10nId: 'toggle-combined',
-        shortcutKey: this.SHORTCUTS.COMBINED,
-        callback: combinedCallback,
-        requireCtrlCmd: true
-      });
-      viewPopup.appendChild(combinedItem);
+      // Add focused mode + bars toggle
+      const focusedModeCombinedCallback = () => {
+        // Always allow focused mode toggle
+        this.toggleFocusedModeCombined(doc);
 
-      // Add focused mode + bars toggle (using F11 on Windows/Linux, Ctrl+Cmd+F on Mac)
-      const focusedModeCombinedCallback = () => this.toggleFocusedModeCombined(doc);
+        // Log that it was triggered
+        this.log("Focused mode toggle triggered via menu/shortcut");
+      };
+
       const focusedModeCombinedItem = this.createMenuItem(doc, {
         id: 'toggle-focused-combined',
         l10nId: 'toggle-focused-combined',
         shortcutKey: this.SHORTCUTS.FOCUSED_MODE,
         callback: focusedModeCombinedCallback,
         requireCtrlCmd: true,
-        f11Special: true  // Special handling for F11 key on Windows/Linux
+        f11Special: true
       });
       viewPopup.appendChild(focusedModeCombinedItem);
+
+      // Set up dynamic menu item state updating
+      this.setupMenuItemUpdating(doc, [focusedModeCombinedItem]);
     } catch (e) {
       this.log(`Error adding menu items: ${e.message}`);
     }
@@ -335,6 +331,53 @@ Toggles = {
     }
   },
 
+  /**
+   * Check if a PDF document is currently being viewed
+   * @returns {boolean} True if viewing a document, false otherwise
+   */
+  isViewingDocument() {
+    try {
+      // Simple and reliable method: check if we're in a reader tab
+      if (Zotero.Tabs && Zotero.Tabs.selectedID) {
+        const currentTabID = Zotero.Tabs.selectedID;
+        const isReaderTab = currentTabID.startsWith('reader-');
+
+        // Add more logging to debug what's happening
+        this.log(`Current tab: ${currentTabID}, is reader tab: ${isReaderTab}`);
+
+        return isReaderTab;
+      }
+
+      return false;
+    } catch (e) {
+      this.log(`Error in isViewingDocument: ${e.message}`);
+      return false;
+    }
+  },
+
+  /**
+   * Update menu item state based on document viewing status - simplified
+   */
+  setupMenuItemUpdating(doc, menuItems) {
+    // Keep items enabled all the time for now
+    this.log("Menu items will remain enabled");
+
+    // We could re-enable this later if needed
+    /*
+    const updateMenuItems = () => {
+      const isViewing = this.isViewingDocument();
+      for (const item of menuItems) {
+        if (item) {
+          item.disabled = false; // Always enabled for testing
+        }
+      }
+    };
+
+    // Initial update
+    updateMenuItems();
+    */
+  },
+
   addToWindow(window, manualPopup = false) {
     try {
       // Use Fluent for localization
@@ -383,6 +426,23 @@ Toggles = {
   removeFromWindow(window) {
     try {
       const doc = window.document;
+
+      // Clear menu update intervals
+      if (this.menuUpdateIntervals) {
+        for (let intervalId of this.menuUpdateIntervals) {
+          window.clearInterval(intervalId);
+        }
+        this.menuUpdateIntervals = [];
+      }
+
+      // Remove keyboard event listeners
+      if (this.registeredShortcuts) {
+        for (let shortcut of this.registeredShortcuts) {
+          if (shortcut.doc === doc && shortcut.handler) {
+            doc.removeEventListener('keydown', shortcut.handler, true);
+          }
+        }
+      }
 
       // Remove all elements added to DOM
       for (let id of this.addedElementIDs) {
