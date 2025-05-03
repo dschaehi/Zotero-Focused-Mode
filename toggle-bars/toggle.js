@@ -7,16 +7,23 @@ Toggles = {
   // Track UI states
   states: {
     tabBar: true,
-    annotationBar: true
+    annotationBar: true,
+    fullscreen: false,  // Add tracking for fullscreen state
+    focused: false  // Add tracking for focused mode state
   },
 
   // Constants
   SHORTCUTS: {
-    COMBINED: "h"  // Combined shortcut
+    COMBINED: "h",  // Combined shortcut for toggling interfaces
+    FOCUSED_MODE: {  // Single shortcut for focused mode
+      mac: "f",     // Ctrl+Cmd+F on Mac
+      other: "F11"  // F11 on Windows/Linux
+    }
   },
 
   // Track added elements for cleanup
   addedElementIDs: [],
+  registeredShortcuts: [],
 
   init({ id, version, rootURI }) {
     if (this.initialized) return;
@@ -34,60 +41,82 @@ Toggles = {
   },
 
   /**
+   * Get platform information (Mac vs other)
+   * @returns {boolean} True if Mac, false otherwise
+   */
+  getPlatform() {
+    try {
+      return Components.classes["@mozilla.org/xre/app-info;1"]
+             .getService(Components.interfaces.nsIXULRuntime)
+             .OS === "Darwin";
+    } catch (e) {
+      try {
+        return Services.appinfo.OS === "Darwin";
+      } catch (e2) {
+        this.log("Platform detection failed, assuming Mac");
+        return true;
+      }
+    }
+  },
+
+  /**
    * Add keyboard shortcut listener with simplified logic
    * @param {Document} doc - Document to attach listener to
-   * @param {string} key - Key to listen for
+   * @param {string|Object} key - Key to listen for, or object with platform-specific keys
    * @param {Function} callback - Function to call when shortcut triggered
    * @param {Object} options - Additional options
    */
   toggleListener(doc, key, callback, options = {}) {
     doc.addEventListener('keydown', (event) => {
-      // Mozilla-compatible platform detection
-      let isMac;
-      try {
-        // First try using Mozilla Components
-        isMac = Components.classes["@mozilla.org/xre/app-info;1"]
-                .getService(Components.interfaces.nsIXULRuntime)
-                .OS === "Darwin";
-      } catch (e) {
-        // Fallback to Services if available
-        try {
-          isMac = Services.appinfo.OS === "Darwin";
-        } catch (e2) {
-          // Last resort hardcoded default (assuming macOS)
-          this.log("Platform detection failed, assuming Mac");
-          isMac = true;
-        }
+      // Get platform information
+      const isMac = this.getPlatform();
+
+      // Handle platform-specific keys
+      let targetKey = key;
+      if (typeof key === 'object') {
+        targetKey = isMac ? key.mac : key.other;
       }
 
-      // Simple case-insensitive key matching
-      const keyMatch = event.key.toLowerCase() === key.toLowerCase();
+      // Match key (case-insensitive)
+      const keyMatch = event.key.toLowerCase() === targetKey.toLowerCase();
+      const isF11 = targetKey === "F11" && event.key === "F11";
 
-      // Log all Ctrl or Cmd key events for debugging
-      if ((event.ctrlKey || event.metaKey) && keyMatch) {
-        this.log(`Key event: ctrl=${event.ctrlKey}, cmd=${event.metaKey}, key=${event.key}`);
+      // Log only relevant events
+      if (((keyMatch && (event.ctrlKey || event.metaKey)) || isF11)) {
+        this.log(`Key event received: ctrl=${event.ctrlKey}, cmd=${event.metaKey}, key=${event.key}, platform=${isMac ? 'Mac' : 'Other'}`);
       }
 
-      // Mac: Check for Ctrl+Cmd+key
-      // Windows/Linux: Check for just Ctrl+key
-      if (options.requireCtrlCmd) {
-        if (isMac && event.ctrlKey && event.metaKey && keyMatch) {
-          this.log(`Mac shortcut triggered: Ctrl+Cmd+${event.key}`);
-          callback();
-          event.preventDefault();
-        }
-        else if (!isMac && event.ctrlKey && keyMatch) {
-          this.log(`Non-Mac shortcut triggered: Ctrl+${event.key}`);
-          callback();
-          event.preventDefault();
-        }
+      // Handle platform-specific shortcuts
+      let shortcutMatched = false;
+
+      // Special case: F11 on Windows/Linux without modifiers
+      if (!isMac && isF11 && options.f11Special) {
+        shortcutMatched = true;
+        this.log("F11 special case matched");
       }
-      // Standard Ctrl+key for all platforms
-      else if (event.ctrlKey && keyMatch) {
+      // Mac: Ctrl+Cmd+key
+      else if (isMac && options.requireCtrlCmd && event.ctrlKey && event.metaKey && keyMatch) {
+        shortcutMatched = true;
+        this.log("Mac Ctrl+Cmd+key shortcut matched");
+      }
+      // Windows/Linux: Ctrl+key
+      else if (!isMac && options.requireCtrlCmd && event.ctrlKey && keyMatch) {
+        shortcutMatched = true;
+        this.log("Windows/Linux Ctrl+key shortcut matched");
+      }
+      // Simple Ctrl+key without platform specifics
+      else if (event.ctrlKey && keyMatch && !options.requireCtrlCmd) {
+        shortcutMatched = true;
+        this.log("Simple Ctrl+key shortcut matched");
+      }
+
+      if (shortcutMatched) {
+        this.log(`Executing callback for shortcut: ${event.key}`);
         callback();
         event.preventDefault();
+        event.stopPropagation();
       }
-    });
+    }, true);
   },
 
   /**
@@ -95,7 +124,7 @@ Toggles = {
    * @param {Document} doc - Document to create element in
    * @param {Object} config - Configuration object
    */
-  createMenuItem(doc, { id, l10nId, shortcutKey, callback, requireCtrlCmd = false }) {
+  createMenuItem(doc, { id, l10nId, shortcutKey, callback, requireCtrlCmd = false, f11Special = false }) {
     const menuItem = doc.createXULElement('menuitem');
     menuItem.id = id;
     menuItem.setAttribute('data-l10n-id', l10nId);
@@ -106,7 +135,28 @@ Toggles = {
 
     // Add keyboard shortcut if provided
     if (shortcutKey) {
-      this.toggleListener(doc, shortcutKey, callback, { requireCtrlCmd });
+      // Skip second registration if keys are the same
+      const isMac = this.getPlatform();
+      const alreadyRegistered =
+        typeof shortcutKey === 'object' &&
+        this.registeredShortcuts &&
+        this.registeredShortcuts.some(s =>
+          s.key === (isMac ? shortcutKey.mac : shortcutKey.other));
+
+      if (!alreadyRegistered) {
+        this.toggleListener(doc, shortcutKey, callback, {
+          requireCtrlCmd,
+          f11Special
+        });
+
+        // Track registered shortcut
+        this.registeredShortcuts = this.registeredShortcuts || [];
+        this.registeredShortcuts.push({
+          key: typeof shortcutKey === 'object' ?
+            (isMac ? shortcutKey.mac : shortcutKey.other) : shortcutKey,
+          id
+        });
+      }
     }
 
     return menuItem;
@@ -131,9 +181,21 @@ Toggles = {
         l10nId: 'toggle-combined',
         shortcutKey: this.SHORTCUTS.COMBINED,
         callback: combinedCallback,
-        requireCtrlCmd: true  // This is true for both Mac and Windows/Linux, just works differently
+        requireCtrlCmd: true
       });
       viewPopup.appendChild(combinedItem);
+
+      // Add focused mode + bars toggle (using F11 on Windows/Linux, Ctrl+Cmd+F on Mac)
+      const focusedModeCombinedCallback = () => this.toggleFocusedModeCombined(doc);
+      const focusedModeCombinedItem = this.createMenuItem(doc, {
+        id: 'toggle-focused-combined',
+        l10nId: 'toggle-focused-combined',
+        shortcutKey: this.SHORTCUTS.FOCUSED_MODE,
+        callback: focusedModeCombinedCallback,
+        requireCtrlCmd: true,
+        f11Special: true  // Special handling for F11 key on Windows/Linux
+      });
+      viewPopup.appendChild(focusedModeCombinedItem);
     } catch (e) {
       this.log(`Error adding menu items: ${e.message}`);
     }
@@ -232,6 +294,44 @@ Toggles = {
                `annotation bar ${this.states.annotationBar ? 'visible' : 'hidden'}`);
     } catch (e) {
       this.log(`Error toggling combined tab bar and annotation bar: ${e.message}`);
+    }
+  },
+
+  toggleFocusedMode(window) {
+    try {
+      if (!window) {
+        this.log("Error: No window provided to toggleFocusedMode");
+        return;
+      }
+
+      // Toggle focused mode state (uses fullscreen under the hood)
+      window.fullScreen = !window.fullScreen;
+      this.states.focused = window.fullScreen;
+      this.log(`Toggled focused mode: ${window.fullScreen ? 'enabled' : 'disabled'}`);
+    } catch (e) {
+      this.log(`Error toggling focused mode: ${e.message}`);
+    }
+  },
+
+  toggleFocusedModeCombined(doc) {
+    try {
+      if (!doc) {
+        this.log("Error: No document provided to toggleFocusedModeCombined");
+        return;
+      }
+
+      // Get the window from document
+      const window = doc.defaultView;
+
+      // Toggle UI elements first
+      this.toggleCombined(doc);
+
+      // Then toggle focused mode
+      this.toggleFocusedMode(window);
+
+      this.log("Toggled focused mode with UI bars hidden");
+    } catch (e) {
+      this.log(`Error in focused mode combined toggle: ${e.message}`);
     }
   },
 
@@ -364,21 +464,32 @@ Toggles = {
           // Method 4: Broader mutation observer for tab changes
           const mainWindow = win.document.getElementById("main-window");
           if (mainWindow) {
-            const observer = new MutationObserver(() => {
-              // Check if tab has changed by looking at the 'selected' attribute on tabs
-              const selectedTab = win.document.querySelector('.tab[selected="true"]');
-              if (selectedTab) {
-                setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
+            this.tabObserver = new MutationObserver((mutations) => {
+              for (const mutation of mutations) {
+                // Look for relevant changes to detect tab switching
+                if (mutation.type === 'attributes' &&
+                    (mutation.attributeName === 'selected' ||
+                     mutation.attributeName === 'class')) {
+                  setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
+                  break;
+                }
               }
             });
 
-            // Observer configuration remains the same
-
-            // Method 5: Use window's hashchange event
-            win.addEventListener('hashchange', () => {
-              setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
+            // Configure observer with appropriate options
+            this.tabObserver.observe(mainWindow, {
+              attributes: true,
+              subtree: true,
+              attributeFilter: ['selected', 'class']
             });
+
+            this.log("Tab mutation observer configured");
           }
+
+          // Method 5: Use window's hashchange event
+          win.addEventListener('hashchange', () => {
+            setTimeout(() => this.restoreUIElementsOnTabChange(), 50);
+          });
         }
       }
     } catch (e) {
@@ -400,6 +511,7 @@ Toggles = {
               titleBar.removeAttribute("style");
               this.states.tabBar = true;
               uiChanged = true;
+              this.log("Tab bar restored on tab change");
             }
           }
         }
@@ -425,14 +537,34 @@ Toggles = {
 
         this.states.annotationBar = true;
         uiChanged = true;
+        this.log("Annotation bar restored on tab change");
+      }
+
+      // Exit focused mode if enabled
+      if (this.states.focused) {
+        for (let win of windows) {
+          if (win.ZoteroPane && win.fullScreen) {
+            win.fullScreen = false;
+            this.states.focused = false;
+            uiChanged = true;
+            this.log("Focused mode exited on tab change");
+          }
+        }
       }
 
       if (uiChanged) {
-        this.log("UI elements automatically restored on tab change");
+        this.log("UI elements and focused mode state automatically restored on tab change");
       }
     } catch (e) {
       this.log(`Error restoring UI elements on tab change: ${e.message}`);
     }
+  },
+
+  debugTabChangeHandling() {
+    this.log("DEBUG: Testing tab change handling");
+    this.log(`Current state - tabBar: ${this.states.tabBar}, annotationBar: ${this.states.annotationBar}, focused: ${this.states.focused}`);
+    this.restoreUIElementsOnTabChange();
+    this.log("DEBUG: Tab change handling test complete");
   },
 
   async main() {
