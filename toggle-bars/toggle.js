@@ -9,7 +9,8 @@ Toggles = {
     tabBar: true,
     annotationBar: true,
     fullscreen: false,  // Add tracking for fullscreen state
-    focused: false  // Add tracking for focused mode state
+    focused: false,  // Add tracking for focused mode state
+    contextPaneState: null // Add tracking for context pane state
   },
 
   // Constants
@@ -18,6 +19,11 @@ Toggles = {
       mac: "f",     // Ctrl+Cmd+F on Mac
       other: "F11"  // F11 on Windows/Linux
     }
+  },
+
+  // Preference keys
+  PREFS: {
+    CONTEXT_PANE_STATE: 'extensions.togglebars.contextPaneState'
   },
 
   // Track added elements for cleanup
@@ -33,6 +39,9 @@ Toggles = {
 
     // Ensure fullscreen CSS is ready
     this.ensureFullscreenCSS();
+
+    // Load saved context pane state
+    this.loadSavedContextPaneState();
 
     // Register tab selection listener
     this.registerTabChangeListener();
@@ -372,23 +381,60 @@ Toggles = {
 
       if (hide) {
         // Store current state before collapsing
-        splitter.dataset.prevState = splitter.getAttribute('state') || '';
+        const currentState = splitter.getAttribute('state') || '';
+        splitter.dataset.prevState = currentState;
+        this.saveContextPaneState(currentState);
         splitter.setAttribute('state', 'collapsed');
         this.log("Context pane hidden");
       } else {
         // Restore previous state
-        const prev = splitter.dataset.prevState;
+        const prev = splitter.dataset.prevState || this.states.contextPaneState || '';
         if (prev) {
           splitter.setAttribute('state', prev);
         } else {
           splitter.removeAttribute('state');
         }
         delete splitter.dataset.prevState;
-        this.log("Context pane restored");
+        this.log(`Context pane restored to state: ${prev || 'default'}`);
       }
     } catch (e) {
       this.log(`Error toggling context pane: ${e.message}`);
     }
+  },
+
+  saveContextPaneState(state) {
+    try {
+      if (!state) return;
+      this.states.contextPaneState = state;
+      Zotero.Prefs.set(this.PREFS.CONTEXT_PANE_STATE, state);
+      this.log(`Saved context pane state: ${state}`);
+    } catch (e) {
+      this.log(`Error saving context pane state: ${e.message}`);
+    }
+  },
+
+  loadSavedContextPaneState() {
+    try {
+      if (Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE)) {
+        this.states.contextPaneState = Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE);
+        this.log(`Loaded saved context pane state: ${this.states.contextPaneState}`);
+      }
+    } catch (e) {
+      this.log(`Error loading context pane state: ${e.message}`);
+    }
+  },
+
+  getContextPaneState() {
+    try {
+      const doc = Zotero.getMainWindow().document;
+      const splitter = doc.querySelector('#zotero-context-splitter');
+      if (splitter) {
+        return splitter.getAttribute('state') || '';
+      }
+    } catch (e) {
+      this.log(`Error getting context pane state: ${e.message}`);
+    }
+    return '';
   },
 
   /**
@@ -653,8 +699,13 @@ Toggles = {
         this.log("Annotation bar restored on tab change");
       }
 
-      // Restore context pane
-      this.toggleContextPane(false);
+      // Restore context pane using saved state
+      const splitter = doc.querySelector('#zotero-context-splitter');
+      if (splitter && splitter.getAttribute('state') === 'collapsed' && this.states.contextPaneState) {
+        // Only restore if we have a saved state and the pane is currently collapsed
+        splitter.setAttribute('state', this.states.contextPaneState);
+        this.log(`Context pane restored to saved state: ${this.states.contextPaneState}`);
+      }
     } catch (e) {
       this.log(`Error restoring UI elements: ${e.message}`);
     }
@@ -695,5 +746,21 @@ Toggles = {
   async main() {
     // Plugin initialization complete
     this.log("Toggle-Bars plugin initialized");
+    
+    // If we're in reader mode, apply the saved context pane state
+    setTimeout(() => {
+      try {
+        if (this.isViewingDocument() && this.states.contextPaneState) {
+          const doc = Zotero.getMainWindow().document;
+          const splitter = doc.querySelector('#zotero-context-splitter');
+          if (splitter) {
+            splitter.setAttribute('state', this.states.contextPaneState);
+            this.log(`Applied saved context pane state on startup: ${this.states.contextPaneState}`);
+          }
+        }
+      } catch (e) {
+        this.log(`Error applying saved context pane state: ${e.message}`);
+      }
+    }, 1000); // Wait a bit to ensure Zotero is fully loaded
   }
 };
