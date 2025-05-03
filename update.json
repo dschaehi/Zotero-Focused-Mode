@@ -1,0 +1,18 @@
+{
+    "addons": {
+      "zotero-focused-mode@example.com": {
+        "updates": [
+          {
+            "version": "1.0.1",
+            "update_link": "https://github.com/dschaehi/Zotero-Focused-Mode/releases/latest/download/zotero-focused-mode.xpi",
+            "applications": {
+              "zotero": {
+                "strict_min_version": "6.999",
+                "strict_max_version": "7.*"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }

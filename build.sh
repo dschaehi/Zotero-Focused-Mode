@@ -3,5 +3,5 @@
 rm -rf build
 mkdir build
 
-cd toggle-bars
-zip -r ../build/toggle-bars.xpi *
+cd zotero-focused-mode
+zip -r ../build/zotero-focused-mode.xpi *
