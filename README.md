@@ -1,6 +1,6 @@
 # Zotero Focused Mode
 
-A plugin that enables you to toggle interface elements in Zotero to create a more distraction-free workspace for focused reading and research.
+A plugin that enables a distraction-free workspace for focused reading and research.
 
 ## Features
 
