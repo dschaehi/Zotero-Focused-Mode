@@ -1,6 +1,6 @@
 # Zotero Focused Mode
 
-A plugin that enables you to toggle interface elements in Zotero to create a more distraction-free workspace for focused reading and research.
+A plugin that enables a distraction-free workspace for focused reading and research.
 
 ## Features
 
@@ -12,7 +12,10 @@ This plugin adds a focused reading mode to Zotero:
 
 | Before  | After |
 | ------------- | ------------- |
-| <img width="1920" alt="Screenshot 2025-05-03 at 11 07 59" src="https://github.com/user-attachments/assets/edb9aad4-c89e-43b9-b3ee-f1863be91cc1" /> | <img width="1920" alt="Screenshot 2025-05-03 at 11 09 23" src="https://github.com/user-attachments/assets/cf66c320-5bfa-407e-a4a0-d4130202e809" /> |
+|<img width="1920" alt="Screenshot 2025-05-03 at 20 34 02" src="https://github.com/user-attachments/assets/37dd4792-64db-4463-b420-2a1c9a1fd8b4" /> | <img width="1920" alt="Screenshot 2025-05-03 at 11 09 23" src="https://github.com/user-attachments/assets/cf66c320-5bfa-407e-a4a0-d4130202e809" /> |
+|<img width="1920" alt="Screenshot 2025-05-03 at 21 53 31" src="https://github.com/user-attachments/assets/e103754f-f5cc-4282-b09a-6219ccf3c882" /> | <img width="1920" alt="Screenshot 2025-05-03 at 21 53 41" src="https://github.com/user-attachments/assets/ff7f73d7-143b-4b52-a0b9-034fce3fcc73" /> |
+
+
 
 ## Keyboard Shortcuts
 
@@ -51,7 +54,10 @@ Alternatively, run the `build.sh` file to create an XPI package and drag it to Z
 
 ## Acknowledgements
 
-This plugin is a fork of the original Zotero-Toggle-Bars plugin created by [Waleed Dahshan](https://github.com/wmstack).
+GPT o3 and the following scripts and the plugin:
+- https://github.com/windingwind/zotero-actions-tags/discussions/385
+- https://github.com/windingwind/zotero-actions-tags/discussions/169
+- https://github.com/wmstack/Zotero-Toggle-Bars
 
 ## License
 
