@@ -34,9 +34,7 @@ The focused mode provides a distraction-free reading experience:
 
 ## Installation
 
-1. Use prebuilt XPI file from the releases page or run the `build.sh` file to create an XPI package.
-   
-1. Drag the resulting XPI file (from the `build` folder) to Zotero's Add-ons Manager dialog.
+Drag the prebuilt XPI file from the releases page (or run the `build.sh` file to create an XPI package) to Zotero's Add-ons Manager dialog.
 
 ## Requirements
 
