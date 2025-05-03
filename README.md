@@ -51,7 +51,10 @@ Alternatively, run the `build.sh` file to create an XPI package and drag it to Z
 
 ## Acknowledgements
 
-This plugin is a fork of the original Zotero-Toggle-Bars plugin created by [Waleed Dahshan](https://github.com/wmstack).
+GPT o3 and the following scripts and the plugin:
+- https://github.com/windingwind/zotero-actions-tags/discussions/385
+- https://github.com/windingwind/zotero-actions-tags/discussions/169
+- https://github.com/wmstack/Zotero-Toggle-Bars
 
 ## License
 
