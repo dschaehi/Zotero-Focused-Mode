@@ -12,7 +12,7 @@ This plugin adds a focused reading mode to Zotero:
 
 | Before  | After |
 | ------------- | ------------- |
-| <img width="1920" alt="Screenshot 2025-05-03 at 11 07 59" src="https://github.com/user-attachments/assets/edb9aad4-c89e-43b9-b3ee-f1863be91cc1" /> | <img width="1920" alt="Screenshot 2025-05-03 at 11 09 23" src="https://github.com/user-attachments/assets/cf66c320-5bfa-407e-a4a0-d4130202e809" /> |
+|<img width="1920" alt="Screenshot 2025-05-03 at 20 34 02" src="https://github.com/user-attachments/assets/37dd4792-64db-4463-b420-2a1c9a1fd8b4" /> | <img width="1920" alt="Screenshot 2025-05-03 at 11 09 23" src="https://github.com/user-attachments/assets/cf66c320-5bfa-407e-a4a0-d4130202e809" /> |
 
 ## Keyboard Shortcuts
 
