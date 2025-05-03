@@ -5,10 +5,7 @@ A plugin that enables a distraction-free workspace for focused reading and resea
 ## Features
 
 This plugin adds a focused reading mode to Zotero:
-- **Focused Reading Mode** - Toggles the visibility of the tab bar and annotation toolbar while entering fullscreen mode
-- Intelligent toggling of UI elements to minimize distractions
-- Automatic restoration of interface when switching tabs
-- Context pane management for maximizing reading space
+- **Focused Reading Mode** - Toggles the visibility of the tab bar, annotation toolbar, and the sidebars while entering fullscreen mode
 
 | Before  | After |
 | ------------- | ------------- |
@@ -22,21 +19,12 @@ This plugin adds a focused reading mode to Zotero:
 - **Mac**: Ctrl+Cmd+F - Toggle focused mode (hides interface elements and enters fullscreen)
 - **Windows/Linux**: F11 - Toggle focused mode (hides interface elements and enters fullscreen)
 
-The keyboard shortcuts are implemented via the View menu and are available globally.
-
 ## Behavior
 
 The focused mode provides a distraction-free reading experience:
 - Hides both the tab bar and annotation toolbar when activated
 - Enters fullscreen mode for a truly immersive experience
 - Hides the context pane to maximize reading space
-
-## How it works
-
-The plugin:
-- Adds a menu item to the View menu
-- Registers keyboard shortcuts for toggling focused mode
-- Adds custom CSS for fullscreen mode
 
 ## Installation
 
@@ -49,7 +37,6 @@ Alternatively, run the `build.sh` file to create an XPI package and drag it to Z
 
 ## Requirements
 
-- Zotero 7.0+
 - Tested on Zotero 7.1 beta
 
 ## Acknowledgements
@@ -58,7 +45,3 @@ GPT o3 and the following scripts and the plugin:
 - https://github.com/windingwind/zotero-actions-tags/discussions/385
 - https://github.com/windingwind/zotero-actions-tags/discussions/169
 - https://github.com/wmstack/Zotero-Toggle-Bars
-
-## License
-
-This project is licensed under the BSD 2-Clause License - see the `LICENSE` file for details.
