@@ -40,7 +40,7 @@ The focused mode provides a distraction-free reading experience:
 
 ## Requirements
 
-- Compatible with Zotero 7.0 and above
+- Tested on Zotero 7.1 beta
 
 ## Acknowledgements
 
