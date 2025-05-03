@@ -31,6 +31,9 @@ Toggles = {
     this.rootURI = rootURI;
     this.initialized = true;
 
+    // Ensure fullscreen CSS is ready
+    this.ensureFullscreenCSS();
+
     // Register tab selection listener
     this.registerTabChangeListener();
   },
@@ -217,43 +220,48 @@ Toggles = {
     }
   },
 
-  toggleAnnotation() {
+  toggleAnnotation(hide) {
     try {
+      const forceState = hide !== undefined;
+
       Zotero.Reader._readers.forEach(reader => {
         if (!reader || !reader._iframeWindow) return;
 
         const doc = reader._iframeWindow.document;
+        const styleId = 'toggle-bars-reader-style';
+        let style = doc.getElementById(styleId);
 
-        if (this.states.annotationBar) {
-          // Hide annotation bar
-          reader._iframeWindow.eval(
-            "document.getElementById('fix-popup')?.remove(); " +
-            "let style = document.createElement('style'); " +
-            "style.id = 'fix-popup'; " +
-            "style.innerHTML = '.view-popup {margin-top: -40px;}'; " +
-            "document.head.appendChild(style)"
-          );
+        // Use the provided state or toggle based on current state
+        const shouldHide = forceState ? hide : this.states.annotationBar;
 
-          // Adjust UI elements
-          this.adjustElement(doc.querySelector(".toolbar"), "display", "none");
-          this.adjustElement(doc.querySelector("#split-view"), "top", "0");
-          this.adjustElement(doc.querySelector("#sidebarContainer"), "top", "0");
-        } else {
-          // Restore annotation bar
-          reader._iframeWindow.eval(
-            "document.getElementById('fix-popup')?.remove()"
-          );
+        if (shouldHide) {
+          // Create or update style to hide elements
+          if (!style) {
+            style = doc.createElement('style');
+            style.id = styleId;
+            doc.head.appendChild(style);
+          }
 
-          // Reset UI elements
-          this.resetElement(doc.querySelector(".toolbar"));
-          this.resetElement(doc.querySelector("#split-view"));
-          this.resetElement(doc.querySelector("#sidebarContainer"));
+          style.textContent = `
+            .toolbar      { display: none !important; }
+            .view-popup   { margin-top: -40px !important; }
+            #sidebarContainer { display: none !important; }
+            #split-view      { top: 0 !important; left: 0 !important; right: 0 !important; }
+            #viewerContainer { top: 0 !important; }
+          `;
+        } else if (style) {
+          // Remove the style element to restore default appearance
+          style.remove();
         }
       });
 
-      this.states.annotationBar = !this.states.annotationBar;
+      if (!forceState) {
+        this.states.annotationBar = !this.states.annotationBar;
+      }
+
+      this.log(`Annotation UI ${this.states.annotationBar ? 'visible' : 'hidden'}`);
     } catch (e) {
-      this.log(`Error toggling annotation bar: ${e.message}`);
+      this.log(`Error toggling annotation UI: ${e.message}`);
     }
   },
 
@@ -319,15 +327,67 @@ Toggles = {
       // Get the window from document
       const window = doc.defaultView;
 
-      // Toggle UI elements first
-      this.toggleCombined(doc);
+      // Ensure fullscreen CSS is in place
+      this.ensureFullscreenCSS();
 
-      // Then toggle focused mode
-      this.toggleFocusedMode(window);
+      // Toggle fullscreen state
+      const enteringFullscreen = !this.states.focused;
 
-      this.log("Toggled focused mode with UI bars hidden");
+      // Apply fullscreen class to root element
+      if (enteringFullscreen) {
+        doc.documentElement.classList.add('fullscreen');
+        doc.documentElement.setAttribute('drawintitlebar', true);
+        doc.documentElement.setAttribute('tabsintitlebar', true);
+        doc.documentElement.setAttribute(
+          'chromemargin',
+          Zotero.isMac ? '0,-1,-1,-1' : '0,2,2,2'
+        );
+      } else {
+        doc.documentElement.classList.remove('fullscreen');
+      }
+
+      // Set OS-level fullscreen
+      window.fullScreen = enteringFullscreen;
+      this.states.focused = enteringFullscreen;
+
+      // Toggle UI elements
+      this.toggleTabBar(doc);
+      this.toggleAnnotation(enteringFullscreen);
+      this.toggleContextPane(enteringFullscreen);
+
+      this.log(`Toggled focused mode: ${enteringFullscreen ? 'enabled' : 'disabled'}`);
     } catch (e) {
       this.log(`Error in focused mode combined toggle: ${e.message}`);
+    }
+  },
+
+  toggleContextPane(hide) {
+    try {
+      const doc = Zotero.getMainWindow().document;
+      const splitter = doc.querySelector('#zotero-context-splitter');
+      if (!splitter) {
+        this.log("Context pane splitter not found");
+        return;
+      }
+
+      if (hide) {
+        // Store current state before collapsing
+        splitter.dataset.prevState = splitter.getAttribute('state') || '';
+        splitter.setAttribute('state', 'collapsed');
+        this.log("Context pane hidden");
+      } else {
+        // Restore previous state
+        const prev = splitter.dataset.prevState;
+        if (prev) {
+          splitter.setAttribute('state', prev);
+        } else {
+          splitter.removeAttribute('state');
+        }
+        delete splitter.dataset.prevState;
+        this.log("Context pane restored");
+      }
+    } catch (e) {
+      this.log(`Error toggling context pane: ${e.message}`);
     }
   },
 
@@ -559,22 +619,18 @@ Toggles = {
 
   restoreUIElementsOnTabChange() {
     try {
-      let uiChanged = false;
-      const windows = Zotero.getMainWindows();
+      // Get main window document
+      const doc = Zotero.getMainWindow().document;
 
-      // Restore tab bar if hidden
+      // If we're in fullscreen/focused mode, leave elements hidden
+      if (this.states.focused) {
+        return;
+      }
+
+      // Otherwise restore all UI elements to visible
       if (!this.states.tabBar) {
-        for (let win of windows) {
-          if (win.ZoteroPane) {
-            const titleBar = win.document.getElementById("zotero-title-bar");
-            if (titleBar) {
-              titleBar.removeAttribute("style");
-              this.states.tabBar = true;
-              uiChanged = true;
-              this.log("Tab bar restored on tab change");
-            }
-          }
-        }
+        this.toggleTabBar(doc);
+        this.log("Tab bar restored on tab change");
       }
 
       // Restore annotation bar if hidden
@@ -582,41 +638,25 @@ Toggles = {
         Zotero.Reader._readers.forEach(reader => {
           if (!reader || !reader._iframeWindow) return;
 
-          const doc = reader._iframeWindow.document;
+          const rdoc = reader._iframeWindow.document;
+          const style = rdoc.getElementById('toggle-bars-reader-style');
+          if (style) style.remove();
 
           // Restore annotation bar
-          reader._iframeWindow.eval(
-            "document.getElementById('fix-popup')?.remove()"
-          );
-
-          // Reset UI elements
-          this.resetElement(doc.querySelector(".toolbar"));
-          this.resetElement(doc.querySelector("#split-view"));
-          this.resetElement(doc.querySelector("#sidebarContainer"));
+          this.resetElement(rdoc.querySelector(".toolbar"));
+          this.resetElement(rdoc.querySelector("#split-view"));
+          this.resetElement(rdoc.querySelector("#viewerContainer"));
+          this.resetElement(rdoc.querySelector("#sidebarContainer"));
         });
 
         this.states.annotationBar = true;
-        uiChanged = true;
         this.log("Annotation bar restored on tab change");
       }
 
-      // Exit focused mode if enabled
-      if (this.states.focused) {
-        for (let win of windows) {
-          if (win.ZoteroPane && win.fullScreen) {
-            win.fullScreen = false;
-            this.states.focused = false;
-            uiChanged = true;
-            this.log("Focused mode exited on tab change");
-          }
-        }
-      }
-
-      if (uiChanged) {
-        this.log("UI elements and focused mode state automatically restored on tab change");
-      }
+      // Restore context pane
+      this.toggleContextPane(false);
     } catch (e) {
-      this.log(`Error restoring UI elements on tab change: ${e.message}`);
+      this.log(`Error restoring UI elements: ${e.message}`);
     }
   },
 
@@ -625,6 +665,31 @@ Toggles = {
     this.log(`Current state - tabBar: ${this.states.tabBar}, annotationBar: ${this.states.annotationBar}, focused: ${this.states.focused}`);
     this.restoreUIElementsOnTabChange();
     this.log("DEBUG: Tab change handling test complete");
+  },
+
+  ensureFullscreenCSS() {
+    try {
+      const doc = Zotero.getMainWindow().document;
+      if (doc.getElementById('fullscreen-style')) return;
+
+      const style = doc.createElement('style');
+      style.id = 'fullscreen-style';
+      style.textContent = `
+        .fullscreen { margin: 0; padding: 0; overflow: hidden; }
+        .fullscreen #mainPane { width: 100vw; height: 100vh; }
+        .fullscreen .zotero-toolbar,
+        .fullscreen .zotero-tb-button,
+        .fullscreen #zotero-title-bar,
+        .fullscreen #main-menubar,
+        .fullscreen #titlebar,
+        .fullscreen .topbar { display: none !important; }
+      `;
+      doc.documentElement.appendChild(style);
+      this.storeAddedElement(style);
+      this.log("Added fullscreen CSS");
+    } catch (e) {
+      this.log(`Error adding fullscreen CSS: ${e.message}`);
+    }
   },
 
   async main() {
