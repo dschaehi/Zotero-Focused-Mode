@@ -209,21 +209,24 @@ Toggles = {
     }
   },
 
-  toggleTabBar(doc) {
+  toggleTabBar(doc, hide) {
     try {
+      const forceState = hide !== undefined
+      const shouldHide = forceState ? hide : this.states.tabBar;
+
       const titleBar = doc.getElementById("zotero-title-bar");
       if (!titleBar) {
         this.log("Tab bar element not found");
         return;
       }
 
-      if (this.states.tabBar) {
+      if (shouldHide) {
         titleBar.style.display = "none";
       } else {
         titleBar.removeAttribute("style");
       }
 
-      this.states.tabBar = !this.states.tabBar;
+      this.states.tabBar = !shouldHide;
     } catch (e) {
       this.log(`Error toggling tab bar: ${e.message}`);
     }
@@ -232,6 +235,8 @@ Toggles = {
   toggleAnnotation(hide) {
     try {
       const forceState = hide !== undefined;
+      // Use the provided state or toggle based on current state
+      const shouldHide = forceState ? hide : this.states.annotationBar;
 
       Zotero.Reader._readers.forEach(reader => {
         if (!reader || !reader._iframeWindow) return;
@@ -239,9 +244,6 @@ Toggles = {
         const doc = reader._iframeWindow.document;
         const styleId = 'toggle-bars-reader-style';
         let style = doc.getElementById(styleId);
-
-        // Use the provided state or toggle based on current state
-        const shouldHide = forceState ? hide : this.states.annotationBar;
 
         if (shouldHide) {
           // Create or update style to hide elements
@@ -264,9 +266,7 @@ Toggles = {
         }
       });
 
-      if (!forceState) {
-        this.states.annotationBar = !this.states.annotationBar;
-      }
+      this.states.annotationBar = !shouldHide;
 
       this.log(`Annotation UI ${this.states.annotationBar ? 'visible' : 'hidden'}`);
     } catch (e) {
@@ -351,16 +351,19 @@ Toggles = {
           'chromemargin',
           Zotero.isMac ? '0,-1,-1,-1' : '0,2,2,2'
         );
+        this.addMouseListener(doc);
       } else {
         doc.documentElement.classList.remove('fullscreen');
+        this.removeMouseListener(doc);
       }
+      this.log(`listener length: ${this.registeredMouseListeners?.length}`);
 
       // Set OS-level fullscreen
       window.fullScreen = enteringFullscreen;
       this.states.focused = enteringFullscreen;
 
       // Toggle UI elements
-      this.toggleTabBar(doc);
+      this.toggleTabBar(doc, enteringFullscreen);
       this.toggleAnnotation(enteringFullscreen);
       this.toggleContextPane(enteringFullscreen);
 
@@ -482,6 +485,62 @@ Toggles = {
     // Initial update
     updateMenuItems();
     */
+  },
+
+  registeredMouseListeners: [],
+
+  addMouseListener(doc) {
+    const listenerElement = doc.querySelector('#browser');
+    const fullscreenElement = doc.querySelector('.fullscreen');
+
+    if (!listenerElement || !fullscreenElement) {
+      return null;
+    }
+
+    const onMoveListener = (e) => {
+      if (e.y < 1) {
+        if (!this.states.tabBar) {
+          this.toggleTabBar(doc, false);
+        }
+        if (!this.states.annotationBar) {
+          this.toggleAnnotation(false);
+        }
+        fullscreenElement.classList.remove('fullscreen');
+      } else {
+        if (this.states.tabBar) {
+          this.toggleTabBar(doc, true);
+        }
+        if (this.states.annotationBar) {
+          this.toggleAnnotation(true);
+        }
+        fullscreenElement.classList.add('fullscreen');
+      }
+    }
+
+    listenerElement.addEventListener('mousemove', onMoveListener, { passive: true });
+    this.log('added mouse event')
+
+    this.registeredMouseListeners ??= [];
+    this.registeredMouseListeners.push({
+      doc,
+      handler: onMoveListener,
+      target: listenerElement,
+    });
+  },
+
+  removeMouseListener(doc) {
+    if (!this.registeredMouseListeners) {
+      return false
+    }
+    for (let i = 0; i < this.registeredMouseListeners.length; i++) {
+      const listener = this.registeredMouseListeners[i];
+      if (listener.doc === doc && listener.handler) {
+        listener.target.removeEventListener('mousemove', listener.handler);
+        this.registeredMouseListeners.splice(i, 1);
+        this.log(`removed mouse listener ${i}`);
+        break;
+      }
+    }
   },
 
   addToWindow(window, manualPopup = false) {
