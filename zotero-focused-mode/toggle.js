@@ -356,7 +356,7 @@ Toggles = {
         doc.documentElement.classList.remove('fullscreen');
         this.removeMouseListener(doc);
       }
-      this.log(`listener length: ${this.registeredMouseListeners?.length}`);
+      this.log(`listener length: ${this.registeredMouseListeners?.size}`);
 
       // Set OS-level fullscreen
       window.fullScreen = enteringFullscreen;
@@ -487,7 +487,7 @@ Toggles = {
     */
   },
 
-  registeredMouseListeners: [],
+  registeredMouseListeners: new Map(),
 
   addMouseListener(doc) {
     const listenerElement = doc.querySelector('#browser');
@@ -520,27 +520,24 @@ Toggles = {
     listenerElement.addEventListener('mousemove', onMoveListener, { passive: true });
     this.log('added mouse event')
 
-    this.registeredMouseListeners ??= [];
-    this.registeredMouseListeners.push({
-      doc,
-      handler: onMoveListener,
-      target: listenerElement,
-    });
+    this.registeredMouseListeners ??= new Map();
+    this.registeredMouseListeners.set(doc, [
+      {
+        handler: onMoveListener,
+        target: listenerElement,
+      },
+    ]);
   },
 
   removeMouseListener(doc) {
-    if (!this.registeredMouseListeners) {
+    const listeners = this.registeredMouseListeners?.get(doc);
+    if (!listeners) {
       return false
     }
-    for (let i = 0; i < this.registeredMouseListeners.length; i++) {
-      const listener = this.registeredMouseListeners[i];
-      if (listener.doc === doc && listener.handler) {
-        listener.target.removeEventListener('mousemove', listener.handler);
-        this.registeredMouseListeners.splice(i, 1);
-        this.log(`removed mouse listener ${i}`);
-        break;
-      }
+    for (const listener of listeners) {
+      listener.target.removeEventListener('mousemove', listener.handler);
     }
+    this.registeredMouseListeners.delete(doc);
   },
 
   addToWindow(window, manualPopup = false) {
