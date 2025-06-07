@@ -490,6 +490,7 @@ Toggles = {
   registeredMouseListeners: new Map(),
 
   addMouseListener(doc) {
+    const MENU_CHANGE_DELAY = 300;
     const listenerElement = doc.querySelector('#browser');
     const fullscreenElement = doc.querySelector('.fullscreen');
 
@@ -497,8 +498,14 @@ Toggles = {
       return null;
     }
 
-    const onMoveListener = (e) => {
-      if (e.y < 1) {
+    let showMenuItemsTimeout = 0;
+    const showMenuItems = () => {
+      clearTimeout(hideMenuItemsTimeout);
+      hideMenuItemsTimeout = 0;
+      if (showMenuItemsTimeout > 0) {
+        return;
+      }
+      showMenuItemsTimeout = setTimeout(() => {
         if (!this.states.tabBar) {
           this.toggleTabBar(doc, false);
         }
@@ -506,7 +513,17 @@ Toggles = {
           this.toggleAnnotation(false);
         }
         fullscreenElement.classList.remove('fullscreen');
-      } else {
+      }, MENU_CHANGE_DELAY);
+    };
+
+    let hideMenuItemsTimeout = 0;
+    const hideMenuItems = () => {
+      clearInterval(showMenuItemsTimeout);
+      showMenuItemsTimeout = 0;
+      if (hideMenuItemsTimeout > 0) {
+        return;
+      }
+      hideMenuItemsTimeout = setTimeout(() => {
         if (this.states.tabBar) {
           this.toggleTabBar(doc, true);
         }
@@ -514,10 +531,24 @@ Toggles = {
           this.toggleAnnotation(true);
         }
         fullscreenElement.classList.add('fullscreen');
+      }, MENU_CHANGE_DELAY);
+    };
+
+    const onMoveListener = (e) => {
+      if (e.y < 1) {
+        showMenuItems();
+      } else {
+        hideMenuItems();
       }
     }
 
+    const onLeaveListener = (e) => {
+      clearInterval(hideMenuItemsTimeout);
+      hideMenuItemsTimeout = 0;
+    }
+
     listenerElement.addEventListener('mousemove', onMoveListener, { passive: true });
+    listenerElement.addEventListener('mouseleave', onLeaveListener, { passive: true });
     this.log('added mouse event')
 
     this.registeredMouseListeners ??= new Map();
@@ -526,6 +557,10 @@ Toggles = {
         handler: onMoveListener,
         target: listenerElement,
       },
+      {
+        handler: onLeaveListener,
+        target: listenerElement,
+      }
     ]);
   },
 
