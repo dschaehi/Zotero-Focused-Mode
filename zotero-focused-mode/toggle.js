@@ -171,6 +171,48 @@ Toggles = {
     return menuItem;
   },
 
+  createMenuSeparator(doc, { id }) {
+    const separator = doc.createXULElement('menuseparator');
+    separator.id = id;
+    this.storeAddedElement(separator);
+    return separator;
+  },
+
+  rightClickMenuItems: new Map(),
+  getRightClickMenuItems(doc) {
+    const saved = this.rightClickMenuItems.get(doc);
+    if (saved) return saved;
+
+    const focusedModeCombinedCallback = () => {
+      this.toggleFocusedModeCombined(doc);
+      this.log("Focused mode toggle triggered via right-click menu");
+    };
+
+    const items = {
+      mainItem: this.createMenuItem(doc, {
+        id: 'toggle-focused-right-click-main',
+        l10nId: 'toggle-focused-right-click',
+        callback: focusedModeCombinedCallback,
+      }),
+      mainSeparator: this.createMenuSeparator(doc, {
+        id: 'toggle-focused-right-click-main-sep'
+      }),
+      readerItem: this.createMenuItem(doc, {
+        id: 'toggle-focused-right-click-reader',
+        l10nId: 'toggle-focused-right-click',
+        callback: focusedModeCombinedCallback,
+      }),
+      readerSeparator: this.createMenuSeparator(doc, {
+        id: 'toggle-focused-right-click-reader-sep'
+      }),
+    };
+    items.mainItem.hidden = !this.states.fullscreen;
+    items.mainSeparator.hidden = !this.states.fullscreen;
+
+    this.rightClickMenuItems.set(doc, items);
+    return items;
+  },
+
   addMenuItems(doc, manualPopup) {
     try {
       // Find the view popup menu
@@ -204,6 +246,12 @@ Toggles = {
 
       // Set up dynamic menu item state updating
       this.setupMenuItemUpdating(doc, [focusedModeCombinedItem]);
+
+      // add right-click menu items
+      const { mainItem, mainSeparator } = this.getRightClickMenuItems(doc);
+      const mainRightClick = doc.getElementById('zotero-itemmenu');
+      mainRightClick?.appendChild(mainSeparator);
+      mainRightClick?.appendChild(mainItem);
     } catch (e) {
       this.log(`Error adding menu items: ${e.message}`);
     }
@@ -352,9 +400,11 @@ Toggles = {
           Zotero.isMac ? '0,-1,-1,-1' : '0,2,2,2'
         );
         this.addMouseListener(doc);
+        this.addRightClickMenuItem(doc);
       } else {
         doc.documentElement.classList.remove('fullscreen');
         this.removeMouseListener(doc);
+        this.removeRightClickMenuItem(doc);
       }
       this.log(`listener length: ${this.registeredMouseListeners?.size}`);
 
@@ -572,6 +622,49 @@ Toggles = {
       listener.target.removeEventListener('mousemove', listener.handler);
     }
     this.registeredMouseListeners.delete(doc);
+  },
+
+  rightClickPopupObservers: new Map(),
+
+  addRightClickMenuItem(doc, win = doc?.defaultView) {
+    try {
+      const { mainItem, mainSeparator, readerItem, readerSeparator } = this.getRightClickMenuItems(doc);
+      mainSeparator.hidden = false;
+      mainItem.hidden = false;
+
+      const observer = this.rightClickPopupObservers.get(doc)
+        || new win.MutationObserver((mutationList) => {
+          for (const mutation of mutationList) {
+            if (mutation.type === 'childList') {
+              const menu = mutation.addedNodes[0];
+              if (menu?.tagName?.toLowerCase() === 'menupopup') {
+                menu.appendChild(readerSeparator);
+                menu.appendChild(readerItem);
+              }
+            }
+          }
+        });
+      this.rightClickPopupObservers.set(doc, observer);
+
+      const readerRightClick = doc.querySelector('browser.reader+popupset');
+      observer.observe(readerRightClick, {
+        childList: true,
+      });
+    } catch (e) {
+      this.log(`Error adding popup observer: ${e.message}`);
+    }
+  },
+
+  removeRightClickMenuItem(doc) {
+    try {
+      const { mainItem, mainSeparator } = this.getRightClickMenuItems(doc);
+      mainItem.hidden = true;
+      mainSeparator.hidden = true;
+      const observer = this.rightClickPopupObservers.get(doc);
+      observer?.disconnect();
+    } catch (e) {
+      this.log(`Error removing popup observer: ${e.message}`);
+    }
   },
 
   addToWindow(window, manualPopup = false) {
