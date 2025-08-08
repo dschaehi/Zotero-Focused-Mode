@@ -8,6 +8,7 @@ Toggles = {
   states: {
     tabBar: true,
     annotationBar: true,
+    sidebar: true,  // Add tracking for sidebar state
     fullscreen: false,  // Add tracking for fullscreen state
     focused: false,  // Add tracking for focused mode state
     contextPaneState: null // Add tracking for context pane state
@@ -304,13 +305,17 @@ Toggles = {
           style.textContent = `
             .toolbar      { display: none !important; }
             .view-popup   { margin-top: -40px !important; }
-            #sidebarContainer { display: none !important; }
             #split-view      { top: 0 !important; left: 0 !important; right: 0 !important; }
             #viewerContainer { top: 0 !important; }
           `;
+          
+          // Handle sidebar separately to allow hover control
+          this.toggleSidebar(true);
         } else if (style) {
           // Remove the style element to restore default appearance
           style.remove();
+          // Restore sidebar to visible
+          this.toggleSidebar(false);
         }
       });
 
@@ -319,6 +324,42 @@ Toggles = {
       this.log(`Annotation UI ${this.states.annotationBar ? 'visible' : 'hidden'}`);
     } catch (e) {
       this.log(`Error toggling annotation UI: ${e.message}`);
+    }
+  },
+
+  toggleSidebar(hide) {
+    try {
+      const forceState = hide !== undefined;
+      const shouldHide = forceState ? hide : this.states.sidebar;
+
+      Zotero.Reader._readers.forEach(reader => {
+        if (!reader || !reader._iframeWindow) return;
+
+        const doc = reader._iframeWindow.document;
+        const sidebarStyleId = 'toggle-bars-sidebar-style';
+        let sidebarStyle = doc.getElementById(sidebarStyleId);
+
+        if (shouldHide) {
+          // Create or update style to hide sidebar
+          if (!sidebarStyle) {
+            sidebarStyle = doc.createElement('style');
+            sidebarStyle.id = sidebarStyleId;
+            doc.head.appendChild(sidebarStyle);
+          }
+
+          sidebarStyle.textContent = `
+            #sidebarContainer { display: none !important; }
+          `;
+        } else if (sidebarStyle) {
+          // Remove the style element to restore sidebar
+          sidebarStyle.remove();
+        }
+      });
+
+      this.states.sidebar = !shouldHide;
+      this.log(`Sidebar ${this.states.sidebar ? 'visible' : 'hidden'}`);
+    } catch (e) {
+      this.log(`Error toggling sidebar: ${e.message}`);
     }
   },
 
@@ -415,6 +456,7 @@ Toggles = {
       // Toggle UI elements
       this.toggleTabBar(doc, enteringFullscreen);
       this.toggleAnnotation(enteringFullscreen);
+      this.toggleSidebar(enteringFullscreen);
       this.toggleContextPane(enteringFullscreen);
 
       this.log(`Toggled focused mode: ${enteringFullscreen ? 'enabled' : 'disabled'}`);
@@ -561,6 +603,9 @@ Toggles = {
         if (!this.states.annotationBar) {
           this.toggleAnnotation(false);
         }
+        if (!this.states.sidebar) {
+          this.toggleSidebar(false);
+        }
         fullscreenElement.classList.remove('fullscreen');
       }, 50);
     };
@@ -579,12 +624,15 @@ Toggles = {
         if (this.states.annotationBar) {
           this.toggleAnnotation(true);
         }
+        if (this.states.sidebar) {
+          this.toggleSidebar(true);
+        }
         fullscreenElement.classList.add('fullscreen');
       }, 150);
     };
 
     const onMoveListener = (e) => {
-      if (e.y < 1) {
+      if (e.y < 5) {  // Increased from 1 to 5 pixels for easier triggering
         showMenuItems();
       } else if (e.y > 50) {
         hideMenuItems();
@@ -880,6 +928,12 @@ Toggles = {
 
         this.states.annotationBar = true;
         this.log("Annotation bar restored on tab change");
+      }
+
+      // Restore sidebar if hidden
+      if (!this.states.sidebar) {
+        this.toggleSidebar(false);
+        this.log("Sidebar restored on tab change");
       }
 
       // Restore context pane using saved state
