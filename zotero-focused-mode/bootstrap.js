@@ -12,7 +12,7 @@ async function startup({ id, version, rootURI }) {
   log("Starting 2.0");
 
   Zotero.PreferencePanes.register({
-    pluginID: 'togglebars@example.com',
+    pluginID: 'zotero-focused-mode@jaeheelee.de',
     src: rootURI + 'preferences.xhtml',
     scripts: [rootURI + 'preferences.js']
   });

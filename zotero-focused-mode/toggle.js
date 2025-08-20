@@ -23,7 +23,8 @@ Toggles = {
 
   // Preference keys
   PREFS: {
-    CONTEXT_PANE_STATE: 'extensions.togglebars.contextPaneState'
+    CONTEXT_PANE_STATE: 'extensions.togglebars.contextPaneState',
+    HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar'
   },
 
   // Track added elements for cleanup
@@ -282,6 +283,8 @@ Toggles = {
 
   toggleAnnotation(hide) {
     try {
+      this.log('hide annotation bar = ' + Zotero.Prefs.get(this.PREFS.HIDE_ANNOTATION_BAR, true))
+
       const forceState = hide !== undefined;
       // Use the provided state or toggle based on current state
       const shouldHide = forceState ? hide : this.states.annotationBar;
@@ -290,6 +293,11 @@ Toggles = {
         if (!reader || !reader._iframeWindow) return;
 
         const doc = reader._iframeWindow.document;
+        if (doc.documentElement) {
+          const hideAnnotationBar = Zotero.Prefs.get(this.PREFS.HIDE_ANNOTATION_BAR, true) ?? true
+          doc.documentElement.dataset.hideAnnotationBar ??= hideAnnotationBar
+        }
+
         const styleId = 'toggle-bars-reader-style';
         let style = doc.getElementById(styleId);
 
@@ -302,11 +310,11 @@ Toggles = {
           }
 
           style.textContent = `
-            .toolbar      { display: none !important; }
-            .view-popup   { margin-top: -40px !important; }
-            #sidebarContainer { display: none !important; }
-            #split-view      { top: 0 !important; left: 0 !important; right: 0 !important; }
-            #viewerContainer { top: 0 !important; }
+            [data-hide-annotation-bar="true"] .toolbar      { display: none !important; }
+            [data-hide-annotation-bar="true"] .view-popup   { margin-top: -40px !important; }
+            [data-hide-annotation-bar="true"] #sidebarContainer { display: none !important; }
+            [data-hide-annotation-bar="true"] #split-view      { top: 0 !important; left: 0 !important; right: 0 !important; }
+            [data-hide-annotation-bar="true"] #viewerContainer { top: 0 !important; }
           `;
         } else if (style) {
           // Remove the style element to restore default appearance
