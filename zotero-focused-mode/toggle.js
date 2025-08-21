@@ -23,7 +23,7 @@ Toggles = {
 
   // Preference keys
   PREFS: {
-    CONTEXT_PANE_STATE: 'extensions.togglebars.contextPaneState',
+    CONTEXT_PANE_STATE: 'extensions.focusedMode.contextPaneState',
     HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar'
   },
 
@@ -467,7 +467,7 @@ Toggles = {
     try {
       if (!state) return;
       this.states.contextPaneState = state;
-      Zotero.Prefs.set(this.PREFS.CONTEXT_PANE_STATE, state);
+      Zotero.Prefs.set(this.PREFS.CONTEXT_PANE_STATE, state, true);
       this.log(`Saved context pane state: ${state}`);
     } catch (e) {
       this.log(`Error saving context pane state: ${e.message}`);
@@ -476,8 +476,9 @@ Toggles = {
 
   loadSavedContextPaneState() {
     try {
-      if (Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE)) {
-        this.states.contextPaneState = Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE);
+      const contextPaneState = Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE, true);
+      if (contextPaneState) {
+        this.states.contextPaneState = contextPaneState;
         this.log(`Loaded saved context pane state: ${this.states.contextPaneState}`);
       }
     } catch (e) {
