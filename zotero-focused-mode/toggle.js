@@ -49,7 +49,7 @@ Toggles = {
   },
 
   log(msg) {
-    Zotero.debug("Toggle-Bars: " + msg);
+    Zotero.debug("Focused Mode: " + msg);
   },
 
   /**
@@ -937,7 +937,7 @@ Toggles = {
 
   async main() {
     // Plugin initialization complete
-    this.log("Toggle-Bars plugin initialized");
+    this.log("Focused Mode plugin initialized");
     
     // If we're in reader mode, apply the saved context pane state
     setTimeout(() => {

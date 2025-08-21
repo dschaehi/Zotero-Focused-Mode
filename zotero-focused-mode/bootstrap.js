@@ -1,7 +1,7 @@
 var Toggles;
 
 function log(msg) {
-  Zotero.debug("Toggle Bars: " + msg);
+  Zotero.debug("Focused Mode: " + msg);
 }
 
 function install() {
