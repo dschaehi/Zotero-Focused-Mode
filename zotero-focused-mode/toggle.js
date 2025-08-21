@@ -294,8 +294,7 @@ Toggles = {
 
         const doc = reader._iframeWindow.document;
         if (doc.documentElement) {
-          const hideAnnotationBar = Zotero.Prefs.get(this.PREFS.HIDE_ANNOTATION_BAR, true) ?? true
-          doc.documentElement.dataset.hideAnnotationBar ??= hideAnnotationBar
+          doc.documentElement.dataset.hideAnnotationBar ??= this.hideAnnotationBar
         }
 
         const styleId = 'toggle-bars-reader-style';
@@ -423,7 +422,9 @@ Toggles = {
       // Toggle UI elements
       this.toggleTabBar(doc, enteringFullscreen);
       this.toggleAnnotation(enteringFullscreen);
-      this.toggleContextPane(enteringFullscreen);
+      if (this.hideAnnotationBar) {
+        this.toggleContextPane(enteringFullscreen);
+      }
 
       this.log(`Toggled focused mode: ${enteringFullscreen ? 'enabled' : 'disabled'}`);
     } catch (e) {
@@ -497,6 +498,14 @@ Toggles = {
       this.log(`Error getting context pane state: ${e.message}`);
     }
     return '';
+  },
+
+  /**
+   * A global preference determining whether to hide annotation bar on focused reading mode
+   * @type {boolean}
+   */
+  get hideAnnotationBar() {
+    return Zotero.Prefs.get(this.PREFS.HIDE_ANNOTATION_BAR, true) ?? true
   },
 
   /**
