@@ -23,7 +23,8 @@ Toggles = {
 
   // Preference keys
   PREFS: {
-    CONTEXT_PANE_STATE: 'extensions.togglebars.contextPaneState'
+    CONTEXT_PANE_STATE: 'extensions.focusedMode.contextPaneState',
+    HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar'
   },
 
   // Track added elements for cleanup
@@ -48,7 +49,7 @@ Toggles = {
   },
 
   log(msg) {
-    Zotero.debug("Toggle-Bars: " + msg);
+    Zotero.debug("Focused Mode: " + msg);
   },
 
   /**
@@ -282,6 +283,8 @@ Toggles = {
 
   toggleAnnotation(hide) {
     try {
+      this.log('hide annotation bar = ' + Zotero.Prefs.get(this.PREFS.HIDE_ANNOTATION_BAR, true))
+
       const forceState = hide !== undefined;
       // Use the provided state or toggle based on current state
       const shouldHide = forceState ? hide : this.states.annotationBar;
@@ -290,6 +293,10 @@ Toggles = {
         if (!reader || !reader._iframeWindow) return;
 
         const doc = reader._iframeWindow.document;
+        if (doc.documentElement) {
+          doc.documentElement.dataset.hideAnnotationBar ??= this.hideAnnotationBar
+        }
+
         const styleId = 'toggle-bars-reader-style';
         let style = doc.getElementById(styleId);
 
@@ -302,11 +309,11 @@ Toggles = {
           }
 
           style.textContent = `
-            .toolbar      { display: none !important; }
-            .view-popup   { margin-top: -40px !important; }
-            #sidebarContainer { display: none !important; }
-            #split-view      { top: 0 !important; left: 0 !important; right: 0 !important; }
-            #viewerContainer { top: 0 !important; }
+            [data-hide-annotation-bar="true"] .toolbar      { display: none !important; }
+            [data-hide-annotation-bar="true"] .view-popup   { margin-top: -40px !important; }
+            [data-hide-annotation-bar="true"] #sidebarContainer { display: none !important; }
+            [data-hide-annotation-bar="true"] #split-view      { top: 0 !important; left: 0 !important; right: 0 !important; }
+            [data-hide-annotation-bar="true"] #viewerContainer { top: 0 !important; }
           `;
         } else if (style) {
           // Remove the style element to restore default appearance
@@ -415,7 +422,9 @@ Toggles = {
       // Toggle UI elements
       this.toggleTabBar(doc, enteringFullscreen);
       this.toggleAnnotation(enteringFullscreen);
-      this.toggleContextPane(enteringFullscreen);
+      if (this.hideAnnotationBar) {
+        this.toggleContextPane(enteringFullscreen);
+      }
 
       this.log(`Toggled focused mode: ${enteringFullscreen ? 'enabled' : 'disabled'}`);
     } catch (e) {
@@ -459,7 +468,7 @@ Toggles = {
     try {
       if (!state) return;
       this.states.contextPaneState = state;
-      Zotero.Prefs.set(this.PREFS.CONTEXT_PANE_STATE, state);
+      Zotero.Prefs.set(this.PREFS.CONTEXT_PANE_STATE, state, true);
       this.log(`Saved context pane state: ${state}`);
     } catch (e) {
       this.log(`Error saving context pane state: ${e.message}`);
@@ -468,8 +477,9 @@ Toggles = {
 
   loadSavedContextPaneState() {
     try {
-      if (Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE)) {
-        this.states.contextPaneState = Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE);
+      const contextPaneState = Zotero.Prefs.get(this.PREFS.CONTEXT_PANE_STATE, true);
+      if (contextPaneState) {
+        this.states.contextPaneState = contextPaneState;
         this.log(`Loaded saved context pane state: ${this.states.contextPaneState}`);
       }
     } catch (e) {
@@ -488,6 +498,14 @@ Toggles = {
       this.log(`Error getting context pane state: ${e.message}`);
     }
     return '';
+  },
+
+  /**
+   * A global preference determining whether to hide annotation bar on focused reading mode
+   * @type {boolean}
+   */
+  get hideAnnotationBar() {
+    return Zotero.Prefs.get(this.PREFS.HIDE_ANNOTATION_BAR, true) ?? true
   },
 
   /**
@@ -928,7 +946,7 @@ Toggles = {
 
   async main() {
     // Plugin initialization complete
-    this.log("Toggle-Bars plugin initialized");
+    this.log("Focused Mode plugin initialized");
     
     // If we're in reader mode, apply the saved context pane state
     setTimeout(() => {
