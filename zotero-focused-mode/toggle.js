@@ -24,7 +24,8 @@ Toggles = {
   // Preference keys
   PREFS: {
     CONTEXT_PANE_STATE: 'extensions.focusedMode.contextPaneState',
-    HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar'
+    HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar',
+    DISABLE_HOVER_REVEAL: 'extensions.focusedMode.disableHoverReveal'
   },
 
   // Track added elements for cleanup
@@ -529,6 +530,14 @@ Toggles = {
   },
 
   /**
+   * A global preference determining whether to disable hover reveal of UI in focused mode
+   * @type {boolean}
+   */
+  get disableHoverReveal() {
+    return Zotero.Prefs.get(this.PREFS.DISABLE_HOVER_REVEAL, true) ?? false
+  },
+
+  /**
    * Check if a PDF document is currently being viewed
    * @returns {boolean} True if viewing a document, false otherwise
    */
@@ -578,6 +587,12 @@ Toggles = {
   registeredMouseListeners: new Map(),
 
   addMouseListener(doc) {
+    // If hover reveal is disabled in preferences, don't add mouse listeners
+    if (this.disableHoverReveal) {
+      this.log('hover reveal disabled in preferences, skipping mouse listeners');
+      return null;
+    }
+
     const listenerElement = doc.querySelector('#browser');
     const fullscreenElement = doc.querySelector('.fullscreen');
 
