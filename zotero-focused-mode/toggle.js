@@ -297,6 +297,15 @@ Toggles = {
           doc.documentElement.dataset.hideAnnotationBar ??= this.hideAnnotationBar
         }
 
+        // Save scroll position before modifying styles
+        const viewerContainer = doc.getElementById('viewerContainer');
+        let savedScrollTop = null;
+        let savedScrollLeft = null;
+        if (viewerContainer) {
+          savedScrollTop = viewerContainer.scrollTop;
+          savedScrollLeft = viewerContainer.scrollLeft;
+        }
+
         const styleId = 'toggle-bars-reader-style';
         let style = doc.getElementById(styleId);
 
@@ -318,6 +327,17 @@ Toggles = {
         } else if (style) {
           // Remove the style element to restore default appearance
           style.remove();
+        }
+
+        // Restore scroll position after modifying styles
+        if (viewerContainer && savedScrollTop != null) {
+          // Use requestAnimationFrame to ensure the DOM has updated
+          reader._iframeWindow.requestAnimationFrame(() => {
+            viewerContainer.scrollTop = savedScrollTop;
+            if (savedScrollLeft != null) {
+              viewerContainer.scrollLeft = savedScrollLeft;
+            }
+          });
         }
       });
 
