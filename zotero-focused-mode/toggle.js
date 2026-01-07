@@ -413,7 +413,7 @@ Toggles = {
       const window = doc.defaultView;
 
       // Ensure fullscreen CSS is in place
-      this.ensureFullscreenCSS();
+      this.ensureFullscreenCSS(doc);
 
       // Toggle fullscreen state
       const enteringFullscreen = !this.states.focused;
@@ -954,12 +954,12 @@ Toggles = {
     this.log("DEBUG: Tab change handling test complete");
   },
 
-  ensureFullscreenCSS() {
+  ensureFullscreenCSS(doc) {
     try {
-      const doc = Zotero.getMainWindow().document;
-      if (doc.getElementById('fullscreen-style')) return;
+      const targetDoc = doc || Zotero.getMainWindow().document;
+      if (targetDoc.getElementById('fullscreen-style')) return;
 
-      const style = doc.createElement('style');
+      const style = targetDoc.createElement('style');
       style.id = 'fullscreen-style';
       style.textContent = `
         .fullscreen { margin: 0; padding: 0; overflow: hidden; }
@@ -971,7 +971,7 @@ Toggles = {
         .fullscreen #titlebar,
         .fullscreen .topbar { display: none !important; }
       `;
-      doc.documentElement.appendChild(style);
+      targetDoc.documentElement.appendChild(style);
       this.storeAddedElement(style);
       this.log("Added fullscreen CSS");
     } catch (e) {
