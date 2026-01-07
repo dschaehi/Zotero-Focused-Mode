@@ -699,7 +699,22 @@ Toggles = {
         });
       this.rightClickPopupObservers.set(doc, observer);
 
-      const readerRightClick = doc.querySelector('browser.reader+popupset');
+      // Try multiple selectors to find the popupset for the reader context menu
+      // In main window, it's a sibling of browser.reader
+      // In standalone/new windows, it might be at a different location
+      let readerRightClick = doc.querySelector('browser.reader+popupset');
+      
+      // Fallback: try to find any popupset in the document (for standalone windows)
+      if (!readerRightClick) {
+        readerRightClick = doc.querySelector('popupset');
+        this.log('Using fallback popupset selector for standalone window');
+      }
+      
+      if (!readerRightClick) {
+        this.log('No popupset found for right-click menu');
+        return;
+      }
+      
       observer.observe(readerRightClick, {
         childList: true,
       });
