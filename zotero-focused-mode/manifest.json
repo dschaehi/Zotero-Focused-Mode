@@ -1,7 +1,7 @@
 {
 	"manifest_version": 2,
 	"name": "Zotero Focused Mode",
-	"version": "0.5.2",
+	"version": "0.5.3",
 	"description": "Allows you to toggle various bars as well as the sidebar",
 	"homepage_url": "https://github.com/dschaehi/Zotero-Focused-Mode/",
 	"icons": {
