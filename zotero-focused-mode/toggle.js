@@ -1039,6 +1039,8 @@ Toggles = {
         `;
         // Enable tabsintitlebar for native window frame appearance (like Firefox)
         targetDoc.documentElement.setAttribute('tabsintitlebar', 'true');
+        // chromemargin format: top,right,bottom,left margins for window chrome
+        // Mac uses -1 (default system chrome) for sides; Windows/Linux uses 2px for visual consistency
         targetDoc.documentElement.setAttribute('chromemargin', Zotero.isMac ? '0,-1,-1,-1' : '0,2,2,2');
         this.log("Applied permanent menu bar hide CSS with native window frame");
       } else {
