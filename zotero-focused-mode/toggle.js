@@ -1015,6 +1015,8 @@ Toggles = {
 
   /**
    * Apply or remove the permanent menu bar hiding CSS
+   * This hides only the menu bar (File/Edit/View menus) while keeping tabs visible.
+   * Also enables tabsintitlebar for native window frame appearance (like Firefox).
    * @param {Document} doc - The document to apply the style to
    * @param {boolean} hide - Whether to hide the menu bar
    */
@@ -1031,15 +1033,22 @@ Toggles = {
           targetDoc.documentElement.appendChild(style);
           this.storeAddedElement(style);
         }
+        // Only hide the menu bar, keep #zotero-title-bar visible (contains tabs)
         style.textContent = `
-          #zotero-title-bar,
-          #main-menubar,
-          #titlebar { display: none !important; }
+          #main-menubar { display: none !important; }
         `;
-        this.log("Applied permanent menu bar hide CSS");
-      } else if (style) {
-        style.remove();
-        this.log("Removed permanent menu bar hide CSS");
+        // Enable tabsintitlebar for native window frame appearance (like Firefox)
+        targetDoc.documentElement.setAttribute('tabsintitlebar', 'true');
+        targetDoc.documentElement.setAttribute('chromemargin', Zotero.isMac ? '0,-1,-1,-1' : '0,2,2,2');
+        this.log("Applied permanent menu bar hide CSS with native window frame");
+      } else {
+        if (style) {
+          style.remove();
+        }
+        // Remove tabsintitlebar attribute when showing menu bar
+        targetDoc.documentElement.removeAttribute('tabsintitlebar');
+        targetDoc.documentElement.removeAttribute('chromemargin');
+        this.log("Removed permanent menu bar hide CSS and native window frame");
       }
     } catch (e) {
       this.log(`Error applying permanent menu bar hide: ${e.message}`);
