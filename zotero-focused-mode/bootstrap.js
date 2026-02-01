@@ -21,6 +21,9 @@ async function startup({ id, version, rootURI }) {
   Toggles.init({ id, version, rootURI });
   Toggles.addToAllWindows();
   await Toggles.main();
+  
+  // Expose Toggles on Zotero for access from preferences pane
+  Zotero.FocusedModeToggles = Toggles;
 }
 
 function onMainWindowLoad({ window }) {
@@ -35,6 +38,7 @@ function shutdown() {
   log("Shutting down 2.0");
   Toggles.removeFromAllWindows();
   Toggles = undefined;
+  delete Zotero.FocusedModeToggles;
 }
 
 function uninstall() {

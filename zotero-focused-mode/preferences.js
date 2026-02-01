@@ -12,5 +12,19 @@ window.FocusedMode_Preferences = {
       })
 		});
 
+		const menuBarCheckbox = document.getElementById("zotero-focused-mode_hide-menu-bar");
+		menuBarCheckbox.addEventListener("click", (e) => {
+      Zotero.debug("Focused Mode: toggled menu bar pref: " + menuBarCheckbox.checked);
+      // Apply/remove the permanent menu bar hide CSS to all windows using the Toggles module
+      if (Zotero.FocusedModeToggles) {
+        const windows = Zotero.getMainWindows();
+        for (let win of windows) {
+          if (win.ZoteroPane) {
+            Zotero.FocusedModeToggles.applyPermanentMenuBarHide(win.document, menuBarCheckbox.checked);
+          }
+        }
+      }
+		});
+
 	}
 };

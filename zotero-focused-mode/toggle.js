@@ -25,7 +25,8 @@ Toggles = {
   PREFS: {
     CONTEXT_PANE_STATE: 'extensions.focusedMode.contextPaneState',
     HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar',
-    DISABLE_HOVER_REVEAL: 'extensions.focusedMode.disableHoverReveal'
+    DISABLE_HOVER_REVEAL: 'extensions.focusedMode.disableHoverReveal',
+    HIDE_MENU_BAR: 'extensions.focusedMode.hideMenuBar'
   },
 
   // Track added elements for cleanup
@@ -41,6 +42,11 @@ Toggles = {
 
     // Ensure fullscreen CSS is ready
     this.ensureFullscreenCSS();
+
+    // Apply permanent menu bar hide if preference is enabled
+    if (this.hideMenuBar) {
+      this.applyPermanentMenuBarHide(null, true);
+    }
 
     // Load saved context pane state
     this.loadSavedContextPaneState();
@@ -538,6 +544,14 @@ Toggles = {
   },
 
   /**
+   * A global preference determining whether to permanently hide the menu/title bar
+   * @type {boolean}
+   */
+  get hideMenuBar() {
+    return Zotero.Prefs.get(this.PREFS.HIDE_MENU_BAR, true) ?? false
+  },
+
+  /**
    * Check if a PDF document is currently being viewed
    * @returns {boolean} True if viewing a document, false otherwise
    */
@@ -740,6 +754,11 @@ Toggles = {
       // Use Fluent for localization
       window.MozXULElement.insertFTLIfNeeded("toggles.ftl");
       this.addMenuItems(window.document, manualPopup);
+      
+      // Apply permanent menu bar hide if preference is enabled
+      if (this.hideMenuBar) {
+        this.applyPermanentMenuBarHide(window.document, true);
+      }
     } catch (e) {
       this.log(`Error adding to window: ${e.message}`);
     }
@@ -991,6 +1010,39 @@ Toggles = {
       this.log("Added fullscreen CSS");
     } catch (e) {
       this.log(`Error adding fullscreen CSS: ${e.message}`);
+    }
+  },
+
+  /**
+   * Apply or remove the permanent menu bar hiding CSS
+   * @param {Document} doc - The document to apply the style to
+   * @param {boolean} hide - Whether to hide the menu bar
+   */
+  applyPermanentMenuBarHide(doc, hide) {
+    try {
+      const targetDoc = doc || Zotero.getMainWindow().document;
+      const styleId = 'permanent-menu-bar-hide-style';
+      let style = targetDoc.getElementById(styleId);
+
+      if (hide) {
+        if (!style) {
+          style = targetDoc.createElement('style');
+          style.id = styleId;
+          targetDoc.documentElement.appendChild(style);
+          this.storeAddedElement(style);
+        }
+        style.textContent = `
+          #zotero-title-bar,
+          #main-menubar,
+          #titlebar { display: none !important; }
+        `;
+        this.log("Applied permanent menu bar hide CSS");
+      } else if (style) {
+        style.remove();
+        this.log("Removed permanent menu bar hide CSS");
+      }
+    } catch (e) {
+      this.log(`Error applying permanent menu bar hide: ${e.message}`);
     }
   },
 
