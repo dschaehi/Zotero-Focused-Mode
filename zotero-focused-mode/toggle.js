@@ -26,7 +26,8 @@ Toggles = {
     CONTEXT_PANE_STATE: 'extensions.focusedMode.contextPaneState',
     HIDE_ANNOTATION_BAR: 'extensions.focusedMode.hideAnnotationBar',
     DISABLE_HOVER_REVEAL: 'extensions.focusedMode.disableHoverReveal',
-    HIDE_MENU_BAR: 'extensions.focusedMode.hideMenuBar'
+    HIDE_MENU_BAR: 'extensions.focusedMode.hideMenuBar',
+    HIDE_TITLE_BAR: 'extensions.focusedMode.hideTitleBar'
   },
 
   // Track added elements for cleanup
@@ -46,6 +47,11 @@ Toggles = {
     // Apply permanent menu bar hide if preference is enabled
     if (this.hideMenuBar) {
       this.applyPermanentMenuBarHide(null, true);
+    }
+
+    // Apply permanent title bar hide if preference is enabled
+    if (this.hideTitleBar) {
+      this.applyPermanentTitleBarHide(null, true);
     }
 
     // Load saved context pane state
@@ -552,6 +558,14 @@ Toggles = {
   },
 
   /**
+   * A global preference determining whether to permanently hide the title bar completely
+   * @type {boolean}
+   */
+  get hideTitleBar() {
+    return Zotero.Prefs.get(this.PREFS.HIDE_TITLE_BAR, true) ?? false
+  },
+
+  /**
    * Check if a PDF document is currently being viewed
    * @returns {boolean} True if viewing a document, false otherwise
    */
@@ -758,6 +772,11 @@ Toggles = {
       // Apply permanent menu bar hide if preference is enabled
       if (this.hideMenuBar) {
         this.applyPermanentMenuBarHide(window.document, true);
+      }
+
+      // Apply permanent title bar hide if preference is enabled
+      if (this.hideTitleBar) {
+        this.applyPermanentTitleBarHide(window.document, true);
       }
     } catch (e) {
       this.log(`Error adding to window: ${e.message}`);
@@ -1054,6 +1073,42 @@ Toggles = {
       }
     } catch (e) {
       this.log(`Error applying permanent menu bar hide: ${e.message}`);
+    }
+  },
+
+  /**
+   * Apply or remove the permanent title bar hiding CSS
+   * This hides the entire title bar (including tabs) for users who prefer maximum screen space.
+   * Useful for Linux users with global menus (like KDE).
+   * @param {Document} doc - The document to apply the style to
+   * @param {boolean} hide - Whether to hide the title bar
+   */
+  applyPermanentTitleBarHide(doc, hide) {
+    try {
+      const targetDoc = doc || Zotero.getMainWindow().document;
+      const styleId = 'permanent-title-bar-hide-style';
+      let style = targetDoc.getElementById(styleId);
+
+      if (hide) {
+        if (!style) {
+          style = targetDoc.createElement('style');
+          style.id = styleId;
+          targetDoc.documentElement.appendChild(style);
+          this.storeAddedElement(style);
+        }
+        // Hide the entire title bar including tabs
+        style.textContent = `
+          #zotero-title-bar { display: none !important; }
+        `;
+        this.log("Applied permanent title bar hide CSS");
+      } else {
+        if (style) {
+          style.remove();
+        }
+        this.log("Removed permanent title bar hide CSS");
+      }
+    } catch (e) {
+      this.log(`Error applying permanent title bar hide: ${e.message}`);
     }
   },
 
