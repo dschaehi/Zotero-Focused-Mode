@@ -26,5 +26,19 @@ window.FocusedMode_Preferences = {
       }
 		});
 
+		const titleBarCheckbox = document.getElementById("zotero-focused-mode_hide-title-bar");
+		titleBarCheckbox.addEventListener("click", (e) => {
+      Zotero.debug("Focused Mode: toggled title bar pref: " + titleBarCheckbox.checked);
+      // Apply/remove the permanent title bar hide CSS to all windows using the Toggles module
+      if (Zotero.FocusedModeToggles) {
+        const windows = Zotero.getMainWindows();
+        for (let win of windows) {
+          if (win.ZoteroPane) {
+            Zotero.FocusedModeToggles.applyPermanentTitleBarHide(win.document, titleBarCheckbox.checked);
+          }
+        }
+      }
+		});
+
 	}
 };
