@@ -1077,35 +1077,35 @@ Toggles = {
   },
 
   /**
-   * Apply or remove the permanent title bar hiding CSS
-   * This hides the entire title bar (including tabs) for users who prefer maximum screen space.
-   * Useful for Linux users with global menus (like KDE).
+   * Apply or remove the permanent window title bar hiding
+   * This hides the OS window decoration/title bar (not the Zotero tab bar) for users who prefer maximum screen space.
+   * Useful for Linux users with global menus (like KDE) who don't need the window title bar.
+   * Uses the hidechrome attribute to remove window decorations.
    * @param {Document} doc - The document to apply the style to
-   * @param {boolean} hide - Whether to hide the title bar
+   * @param {boolean} hide - Whether to hide the window title bar
    */
   applyPermanentTitleBarHide(doc, hide) {
     try {
       const targetDoc = doc || Zotero.getMainWindow().document;
-      const styleId = 'permanent-title-bar-hide-style';
-      let style = targetDoc.getElementById(styleId);
+
+      // Clean up old style element from previous implementation (migration)
+      const oldStyleId = 'permanent-title-bar-hide-style';
+      const oldStyle = targetDoc.getElementById(oldStyleId);
+      if (oldStyle) {
+        oldStyle.remove();
+        this.log("Removed legacy permanent-title-bar-hide-style element");
+      }
 
       if (hide) {
-        if (!style) {
-          style = targetDoc.createElement('style');
-          style.id = styleId;
-          targetDoc.documentElement.appendChild(style);
-          this.storeAddedElement(style);
-        }
-        // Hide the entire title bar including tabs
-        style.textContent = `
-          #zotero-title-bar { display: none !important; }
-        `;
-        this.log("Applied permanent title bar hide CSS");
+        // Hide the OS window title bar (window decoration) using hidechrome attribute
+        // This is useful for Linux users with global menus (like KDE) who want to maximize screen space
+        // Note: This only affects the window decoration, not the Zotero tab bar (#zotero-title-bar)
+        targetDoc.documentElement.setAttribute('hidechrome', 'true');
+        this.log("Applied permanent window title bar hide (hidechrome)");
       } else {
-        if (style) {
-          style.remove();
-        }
-        this.log("Removed permanent title bar hide CSS");
+        // Restore the OS window title bar
+        targetDoc.documentElement.removeAttribute('hidechrome');
+        this.log("Removed permanent window title bar hide (hidechrome)");
       }
     } catch (e) {
       this.log(`Error applying permanent title bar hide: ${e.message}`);
