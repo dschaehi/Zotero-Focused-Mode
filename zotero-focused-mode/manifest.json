@@ -1,8 +1,8 @@
 {
 	"manifest_version": 2,
 	"name": "Zotero Focused Mode",
-	"version": "0.6.0",
-	"description": "Allows you to toggle various bars as well as the sidebar",
+	"version": "0.6.1",
+	"description": "A plugin that enables a distraction-free workspace for focused reading.",
 	"homepage_url": "https://github.com/dschaehi/Zotero-Focused-Mode/",
 	"icons": {
 		"16": "icons/icon-16.png",
