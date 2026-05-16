@@ -27,6 +27,7 @@ This plugin adds a focused reading mode to Zotero:
 The focused mode provides a distraction-free reading experience:
 - Hides both the tab bar and annotation toolbar when activated
 - Enters fullscreen mode for a truly immersive experience
+- Preserves an already-active fullscreen session when focused mode is turned off
 - Hides the context pane to maximize reading space
 
 ## Installation
