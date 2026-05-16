@@ -9,6 +9,7 @@ Toggles = {
     tabBar: true,
     annotationBar: true,
     fullscreen: false,  // Add tracking for fullscreen state
+    fullscreenEnteredByFocusedMode: false,
     focused: false,  // Add tracking for focused mode state
     contextPaneState: null // Add tracking for context pane state
   },
@@ -80,6 +81,16 @@ Toggles = {
    * @param {Object} options - Additional options
    */
   toggleListener(doc, key, callback, options = {}) {
+    let resolvedKey = key;
+    if (typeof key === 'object') {
+      resolvedKey = this.getPlatform() ? key.mac : key.other;
+    }
+
+    this.registeredShortcuts = this.registeredShortcuts || [];
+    if (this.registeredShortcuts.some(shortcut => shortcut.doc === doc && shortcut.key === resolvedKey)) {
+      return;
+    }
+
     // Create a named function for the event handler so we can track it
     const keydownHandler = (event) => {
       // Get platform information
@@ -131,13 +142,24 @@ Toggles = {
     doc.addEventListener('keydown', keydownHandler, true);
 
     // Store reference to the handler for cleanup
-    this.registeredShortcuts = this.registeredShortcuts || [];
     this.registeredShortcuts.push({
       doc,
       handler: keydownHandler,
-      key: typeof key === 'object' ?
-        (this.getPlatform() ? key.mac : key.other) : key
+      key: resolvedKey
     });
+  },
+
+  toggleReaderListeners(window, key, callback, options = {}) {
+    const readers = Zotero.Reader?._readers || [];
+    for (const reader of readers) {
+      const readerDoc = reader?._iframeWindow?.document;
+      const ownerWindow = readerDoc?.defaultView?.top || readerDoc?.defaultView;
+      if (!readerDoc || ownerWindow !== window) {
+        continue;
+      }
+
+      this.toggleListener(readerDoc, key, callback, options);
+    }
   },
 
   /**
@@ -165,6 +187,10 @@ Toggles = {
     // Add keyboard shortcut - always register it
     if (shortcutKey) {
       this.toggleListener(doc, shortcutKey, wrappedCallback, {
+        requireCtrlCmd,
+        f11Special
+      });
+      this.toggleReaderListeners(doc.defaultView, shortcutKey, wrappedCallback, {
         requireCtrlCmd,
         f11Special
       });
@@ -393,10 +419,23 @@ Toggles = {
         return;
       }
 
-      // Toggle focused mode state (uses fullscreen under the hood)
-      window.fullScreen = !window.fullScreen;
-      this.states.focused = window.fullScreen;
-      this.log(`Toggled focused mode: ${window.fullScreen ? 'enabled' : 'disabled'}`);
+      const enteringFocusedMode = !this.states.focused;
+
+      if (enteringFocusedMode) {
+        this.states.fullscreenEnteredByFocusedMode = !window.fullScreen;
+        if (this.states.fullscreenEnteredByFocusedMode) {
+          window.fullScreen = true;
+        }
+      } else {
+        if (this.states.fullscreenEnteredByFocusedMode && window.fullScreen) {
+          window.fullScreen = false;
+        }
+        this.states.fullscreenEnteredByFocusedMode = false;
+      }
+
+      this.states.fullscreen = window.fullScreen;
+      this.states.focused = enteringFocusedMode;
+      this.log(`Toggled focused mode: ${enteringFocusedMode ? 'enabled' : 'disabled'}`);
     } catch (e) {
       this.log(`Error toggling focused mode: ${e.message}`);
     }
@@ -411,6 +450,7 @@ Toggles = {
 
       // Get the window from document
       const window = doc.defaultView;
+      const wasFullscreen = window.fullScreen;
 
       // Ensure fullscreen CSS is in place
       this.ensureFullscreenCSS(doc);
@@ -436,8 +476,19 @@ Toggles = {
       }
       this.log(`listener length: ${this.registeredMouseListeners?.size}`);
 
-      // Set OS-level fullscreen
-      window.fullScreen = enteringFullscreen;
+      if (enteringFullscreen) {
+        this.states.fullscreenEnteredByFocusedMode = !wasFullscreen;
+        if (this.states.fullscreenEnteredByFocusedMode) {
+          window.fullScreen = true;
+        }
+      } else {
+        if (this.states.fullscreenEnteredByFocusedMode && window.fullScreen) {
+          window.fullScreen = false;
+        }
+        this.states.fullscreenEnteredByFocusedMode = false;
+      }
+
+      this.states.fullscreen = window.fullScreen;
       this.states.focused = enteringFullscreen;
 
       // Toggle UI elements
@@ -794,11 +845,16 @@ Toggles = {
 
       // Remove keyboard event listeners
       if (this.registeredShortcuts) {
-        for (let shortcut of this.registeredShortcuts) {
-          if (shortcut.doc === doc && shortcut.handler) {
-            doc.removeEventListener('keydown', shortcut.handler, true);
+        this.registeredShortcuts = this.registeredShortcuts.filter((shortcut) => {
+          const shortcutWindow = shortcut.doc?.defaultView?.top || shortcut.doc?.defaultView;
+          const belongsToWindow = shortcut.doc === doc || shortcutWindow === window;
+
+          if (belongsToWindow && shortcut.handler) {
+            shortcut.doc.removeEventListener('keydown', shortcut.handler, true);
           }
-        }
+
+          return !belongsToWindow;
+        });
       }
 
       // Remove all elements added to DOM
