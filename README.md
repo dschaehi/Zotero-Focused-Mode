@@ -1,4 +1,4 @@
-#### ⚠️ Automatic update on Zotero works starting from version 0.2.0 of this extension. If you installed version 0.1.0, then you'll need to manually download the latest version of this extension to enable automatic update.
+[![Zotero Plugins grade](https://zoteroplugins.org/badge/zotero-focused-mode.svg)](https://zoteroplugins.org/p/zotero-focused-mode)
 
 # Zotero Focused Mode
 A plugin that enables a distraction-free workspace for focused reading.
